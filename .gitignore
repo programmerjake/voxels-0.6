@@ -19,3 +19,11 @@
 *.exe
 *.out
 *.app
+
+bin
+obj
+*.layout
+*.depend
+*~
+voxels-0.6-debug
+voxels-0.6
