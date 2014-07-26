@@ -15,12 +15,19 @@
  * MA 02110-1301, USA.
  *
  */
+#if 1
+#warning finish main.cpp
+int main()
+{
+    return 0;
+}
+#else
 #include "client.h"
 #include "server.h"
-#include "stream.h"
-#include "network.h"
-#include "util.h"
-#include "game_version.h"
+#include "stream/stream.h"
+#include "stream/network.h"
+#include "util/util.h"
+#include "util/game_version.h"
 #include <thread>
 #include <vector>
 #include <iostream>
@@ -154,3 +161,4 @@ int main(int argc, char ** argv)
     }
     return myMain(args);
 }
+#endif

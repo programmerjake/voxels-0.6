@@ -30,6 +30,9 @@
 				<Linker>
 					<Add option="-s" />
 				</Linker>
+				<ExtraCommands>
+					<Add before="./update-version.sh" />
+				</ExtraCommands>
 			</Target>
 		</Build>
 		<Compiler>
@@ -38,6 +41,7 @@
 			<Add option="-Wall" />
 			<Add option="-mfpmath=sse" />
 			<Add option="`sdl2-config --cflags`" />
+			<Add directory="include" />
 		</Compiler>
 		<Linker>
 			<Add option="`sdl2-config --libs`" />
@@ -47,6 +51,48 @@
 			<Add library="vorbis" />
 			<Add library="vorbisfile" />
 		</Linker>
+		<Unit filename="include/decoder/ogg_vorbis_decoder.h" />
+		<Unit filename="include/decoder/png_decoder.h" />
+		<Unit filename="include/physics/physics.h" />
+		<Unit filename="include/platform/audio.h" />
+		<Unit filename="include/platform/event.h" />
+		<Unit filename="include/platform/platform.h" />
+		<Unit filename="include/render/generate.h" />
+		<Unit filename="include/render/mesh.h" />
+		<Unit filename="include/render/render_layer.h" />
+		<Unit filename="include/render/text.h" />
+		<Unit filename="include/script/script.h" />
+		<Unit filename="include/script/script_nodes.h" />
+		<Unit filename="include/stream/compressed_stream.h" />
+		<Unit filename="include/stream/network.h" />
+		<Unit filename="include/stream/stream.h" />
+		<Unit filename="include/texture/image.h" />
+		<Unit filename="include/texture/texture_atlas.h" />
+		<Unit filename="include/texture/texture_descriptor.h" />
+		<Unit filename="include/util/color.h" />
+		<Unit filename="include/util/dimension.h" />
+		<Unit filename="include/util/game_version.h" />
+		<Unit filename="include/util/matrix.h" />
+		<Unit filename="include/util/position.h" />
+		<Unit filename="include/util/util.h" />
+		<Unit filename="include/util/vector.h" />
+		<Unit filename="src/decoder/png_decoder.cpp" />
+		<Unit filename="src/physics/physics.cpp" />
+		<Unit filename="src/platform/audio.cpp" />
+		<Unit filename="src/platform/main.cpp" />
+		<Unit filename="src/platform/platform.cpp" />
+		<Unit filename="src/render/mesh.cpp" />
+		<Unit filename="src/render/text.cpp" />
+		<Unit filename="src/script/script.cpp" />
+		<Unit filename="src/stream/compressed_stream.cpp" />
+		<Unit filename="src/stream/network.cpp" />
+		<Unit filename="src/stream/stream.cpp" />
+		<Unit filename="src/texture/image.cpp" />
+		<Unit filename="src/texture/texture_atlas.cpp" />
+		<Unit filename="src/util/game_version.cpp" />
+		<Unit filename="src/util/matrix.cpp" />
+		<Unit filename="src/util/util.cpp" />
+		<Unit filename="src/util/vector.cpp" />
 		<Extensions>
 			<code_completion />
 			<envvars />

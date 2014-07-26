@@ -21,9 +21,9 @@
 #include <GL/gl.h>
 #include <string>
 #include <memory>
-#include "matrix.h"
-#include "vector.h"
-#include "stream.h"
+#include "util/matrix.h"
+#include "util/vector.h"
+#include "stream/stream.h"
 
 #ifndef EVENT_H_INCLUDED
 class EventHandler;

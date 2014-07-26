@@ -15,4 +15,19 @@
  * MA 02110-1301, USA.
  *
  */
-#include "physics/physics.h"
+#include "render/mesh.h"
+#include "platform/platform.h"
+#include <iostream>
+
+using namespace std;
+
+Renderer & Renderer::operator <<(const Mesh_t & m)
+{
+    m.texture().bind();
+    glVertexPointer(3, GL_FLOAT, 0, (const void *)m.points.data());
+    glTexCoordPointer(2, GL_FLOAT, 0, (const void *)m.textureCoords.data());
+    glColorPointer(4, GL_FLOAT, 0, (const void *)m.colors.data());
+    glDrawArrays(GL_TRIANGLES, 0, (GLint)m.size() * 3);
+    return *this;
+}
+

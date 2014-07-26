@@ -485,24 +485,24 @@ public:
             assert(container == r.container && container != nullptr);
             difference_type loc = index + arraySize - container->frontIndex;
 
-            if(loc >= arraySize)
+            if((size_t)loc >= arraySize)
             {
                 loc -= arraySize;
             }
 
-            if(loc >= arraySize)
+            if((size_t)loc >= arraySize)
             {
                 loc -= arraySize;
             }
 
             difference_type rloc = r.index + arraySize - container->frontIndex;
 
-            if(rloc >= arraySize)
+            if((size_t)rloc >= arraySize)
             {
                 rloc -= arraySize;
             }
 
-            if(rloc >= arraySize)
+            if((size_t)rloc >= arraySize)
             {
                 rloc -= arraySize;
             }

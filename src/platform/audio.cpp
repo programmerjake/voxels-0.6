@@ -1,5 +1,5 @@
-#include "audio.h"
-#include "platform.h"
+#include "platform/audio.h"
+#include "platform/platform.h"
 #include <mutex>
 #include <thread>
 #include <chrono>
@@ -9,8 +9,8 @@
 #include <iostream>
 #include <cstdlib>
 #include <sstream>
-#include "util.h"
-#include "ogg_vorbis_decoder.h"
+#include "util/util.h"
+#include "decoder/ogg_vorbis_decoder.h"
 
 using namespace std;
 

@@ -21,7 +21,7 @@
 #include <string>
 #include <cstdint>
 #include <stdexcept>
-#include "stream.h"
+#include "stream/stream.h"
 
 using namespace std;
 

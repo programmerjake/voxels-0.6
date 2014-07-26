@@ -8,8 +8,8 @@
 #include <vector>
 #include <array>
 #include <limits>
-#include "stream.h"
-#include "util.h"
+#include "stream/stream.h"
+#include "util/util.h"
 
 using namespace std;
 

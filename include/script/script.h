@@ -20,8 +20,8 @@
 
 #include <cstdint>
 #include <memory>
-#include "stream.h"
-#include "mesh.h"
+#include "stream/stream.h"
+#include "render/mesh.h"
 #include <unordered_map>
 #include "client.h"
 #include <sstream>

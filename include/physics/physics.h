@@ -19,10 +19,10 @@
 #define PHYSICS_OBJECT_H_INCLUDED
 
 #include <memory>
-#include "matrix.h"
-#include "position.h"
-#include "stream.h"
-#include "script.h"
+#include "util/matrix.h"
+#include "util/position.h"
+#include "stream/stream.h"
+#include "script/script.h"
 #include <unordered_map>
 #include <unordered_set>
 #include <algorithm>

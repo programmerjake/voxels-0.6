@@ -15,12 +15,12 @@
  * MA 02110-1301, USA.
  *
  */
-#include "png_decoder.h"
+#include "decoder/png_decoder.h"
 #include <png.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cerrno>
-#include "util.h"
+#include "util/util.h"
 
 using namespace std;
 

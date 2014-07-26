@@ -24,8 +24,8 @@
 #include <stdexcept>
 #include <mutex>
 #include <memory>
-#include "color.h"
-#include "stream.h"
+#include "util/color.h"
+#include "stream/stream.h"
 #include "client.h"
 
 using namespace std;

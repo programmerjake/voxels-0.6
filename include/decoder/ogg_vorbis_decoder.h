@@ -1,8 +1,8 @@
 #ifndef OGG_VORBIS_DECODER_H_INCLUDED
 #define OGG_VORBIS_DECODER_H_INCLUDED
 
-#include "stream.h"
-#include "audio.h"
+#include "stream/stream.h"
+#include "platform/audio.h"
 #include <vorbis/vorbisfile.h>
 #include <cerrno>
 #include <iostream>

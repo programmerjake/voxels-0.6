@@ -15,12 +15,12 @@
  * MA 02110-1301, USA.
  *
  */
-#include "platform.h"
+#include "platform/platform.h"
 #include <SDL2/SDL.h>
 #include <GL/gl.h>
-#include "matrix.h"
-#include "vector.h"
-#include "game_version.h"
+#include "util/matrix.h"
+#include "util/vector.h"
+#include "util/game_version.h"
 #include <cwchar>
 #include <string>
 #include <iostream>
@@ -29,7 +29,7 @@
 #include <atomic>
 #include <thread>
 #include <mutex>
-#include "audio.h"
+#include "platform/audio.h"
 
 #ifndef SDL_HINT_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK
 #define SDL_HINT_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK "SDL_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK"

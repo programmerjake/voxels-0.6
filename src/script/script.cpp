@@ -15,9 +15,9 @@
  * MA 02110-1301, USA.
  *
  */
-#include "script.h"
-#include "script_nodes.h"
-#include "util.h"
+#include "script/script.h"
+#include "script/script_nodes.h"
+#include "util/util.h"
 #include <cwctype>
 #include <sstream>
 #include <cstdlib>
