@@ -18,7 +18,7 @@
 #ifndef NETWORK_H_INCLUDED
 #define NETWORK_H_INCLUDED
 
-#include "stream.h"
+#include "stream/stream.h"
 #include <memory>
 
 class NetworkException : public IOException

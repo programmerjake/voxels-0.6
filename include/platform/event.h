@@ -18,7 +18,7 @@
 #ifndef EVENT_H_INCLUDED
 #define EVENT_H_INCLUDED
 
-#include "platform.h"
+#include "platform/platform.h"
 #include <memory>
 
 class KeyDownEvent;

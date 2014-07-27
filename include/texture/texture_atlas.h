@@ -18,7 +18,7 @@
 #ifndef TEXTURE_ATLAS_H_INCLUDED
 #define TEXTURE_ATLAS_H_INCLUDED
 
-#include "texture_descriptor.h"
+#include "texture/texture_descriptor.h"
 
 class TextureAtlas final
 {

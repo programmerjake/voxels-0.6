@@ -18,7 +18,7 @@
 #ifndef SCRIPT_NODES_H_INCLUDED
 #define SCRIPT_NODES_H_INCLUDED
 
-#include "script.h"
+#include "script/script.h"
 
 namespace Scripting
 {

@@ -19,7 +19,7 @@
 #define RENDER_LAYER_H_INCLUDED
 
 #include <cstdint>
-#include "stream.h"
+#include "stream/stream.h"
 
 using namespace std;
 

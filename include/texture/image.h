@@ -112,4 +112,16 @@ private:
     void copyOnWrite();
 };
 
+template <>
+inline Image read<Image>(Reader &reader, VariableSet &variableSet)
+{
+    return Image::read(reader, variableSet);
+}
+
+template <>
+inline void write<Image>(Writer &writer, VariableSet &variableSet, Image value)
+{
+    value.write(writer, variableSet);
+}
+
 #endif // IMAGE_H

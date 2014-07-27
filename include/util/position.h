@@ -18,9 +18,9 @@
 #ifndef POSITION_H_INCLUDED
 #define POSITION_H_INCLUDED
 
-#include "dimension.h"
-#include "vector.h"
-#include "util.h"
+#include "util/dimension.h"
+#include "util/vector.h"
+#include "util/util.h"
 #include <unordered_set>
 #include <vector>
 #include <list>
@@ -359,7 +359,5 @@ struct UpdateList // in here because of include issues : should be in util.h
         return updatesList.empty();
     }
 };
-
-
 
 #endif // POSITION_H_INCLUDED

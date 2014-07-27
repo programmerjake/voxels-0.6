@@ -249,4 +249,4 @@ unsigned getGlobalAudioChannelCount();
 bool audioRunning();
 
 #endif // PLATFORM_H_INCLUDED
-#include "event.h"
+#include "platform/event.h"

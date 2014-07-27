@@ -18,7 +18,7 @@
 #ifndef TEXT_H_INCLUDED
 #define TEXT_H_INCLUDED
 
-#include "generate.h"
+#include "render/generate.h"
 #include <cwchar>
 #include <string>
 

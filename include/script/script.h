@@ -659,6 +659,14 @@ public:
             n->write(writer);
         }
     }
+    static shared_ptr<Script> read(Reader &reader, VariableSet &)
+    {
+        return read(reader);
+    }
+    void write(Writer &writer, VariableSet &)
+    {
+        return write(writer);
+    }
 };
 
 inline shared_ptr<Scripting::Data> Scripting::Data::read(Reader &reader)
@@ -686,15 +694,6 @@ inline shared_ptr<Scripting::Data> Scripting::Data::read(Reader &reader)
         break;
     }
     assert(false);
-}
-
-template <>
-void write<Script>(Writer &writer, VariableSet &variableSet, shared_ptr<Script> value)
-{
-    if(!value)
-    {
-        return;
-    }
 }
 
 inline void runEntityPartScript(Mesh dest, Mesh partMesh, shared_ptr<Script> script, VectorF position, VectorF velocity, float age, shared_ptr<Scripting::DataObject> ioObject = make_shared<Scripting::DataObject>())

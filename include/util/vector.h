@@ -15,7 +15,7 @@
  * MA 02110-1301, USA.
  *
  */
-#include "util.h"
+#include "util/util.h"
 #ifndef VECTOR_H
 #define VECTOR_H
 

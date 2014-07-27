@@ -22,6 +22,7 @@
 #include "util/matrix.h"
 #include "util/position.h"
 #include "stream/stream.h"
+#include "util/variable_set.h"
 #include "script/script.h"
 #include <unordered_map>
 #include <unordered_set>
@@ -56,6 +57,8 @@ struct PhysicsProperties final
     }
 };
 
+
+
 class PhysicsConstraint final
 {
     shared_ptr<Script> script;
@@ -66,15 +69,23 @@ public:
         assert(script);
     }
     void operator()(PositionF & position, VectorF velocity) const;
-    static PhysicsConstraint read(Reader &reader)
+    shared_ptr<Script> getScript() const
     {
-        return PhysicsConstraint(Script::read(reader));
-    }
-    void write(Writer &writer) const
-    {
-        script->write(writer);
+        return script;
     }
 };
+
+template <>
+inline PhysicsConstraint read<PhysicsConstraint>(Reader &reader, VariableSet &variableSet)
+{
+    return PhysicsConstraint(read<Script>(reader, variableSet));
+}
+
+template <>
+inline void write<PhysicsConstraint>(Writer &writer, VariableSet &variableSet, PhysicsConstraint value)
+{
+    write<Script>(writer, variableSet, value.getScript());
+}
 
 class PhysicsObject final : public enable_shared_from_this<PhysicsObject>
 {

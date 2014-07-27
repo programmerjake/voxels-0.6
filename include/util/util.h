@@ -15,7 +15,7 @@
  * MA 02110-1301, USA.
  *
  */
-#include "position.h"
+#include "util/position.h"
 #ifndef UTIL_H
 #define UTIL_H
 

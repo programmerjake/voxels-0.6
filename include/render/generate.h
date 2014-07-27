@@ -18,7 +18,7 @@
 #ifndef GENERATE_H_INCLUDED
 #define GENERATE_H_INCLUDED
 
-#include "mesh.h"
+#include "render/mesh.h"
 #include <utility>
 
 inline Mesh invert(Mesh mesh)
