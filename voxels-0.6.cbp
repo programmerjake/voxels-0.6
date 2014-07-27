@@ -74,6 +74,7 @@
 		<Unit filename="include/util/circular_deque.h" />
 		<Unit filename="include/util/color.h" />
 		<Unit filename="include/util/dimension.h" />
+		<Unit filename="include/util/enum_traits.h" />
 		<Unit filename="include/util/flag.h" />
 		<Unit filename="include/util/game_version.h" />
 		<Unit filename="include/util/matrix.h" />

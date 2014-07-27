@@ -22,13 +22,18 @@
 #include <cassert>
 #include <ostream>
 #include <cwchar>
+#include "util/enum_traits.h"
 
 using namespace std;
 
 enum class Dimension : uint_fast8_t
 {
     Overworld,
-    Last
+};
+
+template <>
+struct enum_traits<Dimension> : public enum_traits_default<Dimension, uint8_t, Dimension::Overworld, Dimension::Overworld>
+{
 };
 
 inline float getZeroBrightnessLevel(Dimension d)
@@ -37,8 +42,6 @@ inline float getZeroBrightnessLevel(Dimension d)
     {
     case Dimension::Overworld:
         return 0;
-    case Dimension::Last:
-        break;
     }
     assert(false);
 }

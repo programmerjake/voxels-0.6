@@ -138,4 +138,48 @@ public:
     }
 };
 
+template <typename T>
+inline VariableSet::Descriptor<T> read<VariableSet::Descriptor<T>>(Reader &reader)
+{
+    return VariableSet::Descriptor<T>::read(reader);
+}
+
+template <typename T>
+inline void write<VariableSet::Descriptor<T>>(Writer &writer, VariableSet::Descriptor<T> value)
+{
+    value.write(writer);
+}
+
+template <typename T>
+inline shared_ptr<T> read(Reader &reader, VariableSet &variableSet)
+{
+    VariableSet::Descriptor<T> descriptor = read<VariableSet::Descriptor<T>>(reader);
+    if(!descriptor)
+        return nullptr;
+    shared_ptr<T> retval = variableSet.get(descriptor);
+    if(retval != nullptr)
+        return retval;
+    retval = T::read(reader, variableSet);
+    variableSet.set(descriptor, retval);
+    return retval;
+}
+
+template <typename T>
+inline void write(Writer &writer, VariableSet &variableSet, shared_ptr<T> value)
+{
+    if(value == nullptr)
+    {
+        write<VariableSet::Descriptor<T>>(writer, VariableSet::Descriptor<T>::null());
+        return;
+    }
+    pair<VariableSet::Descriptor<T>, bool> findOrMakeReturnValue = variableSet.findOrMake<T>(value);
+    write<VariableSet::Descriptor<T>>(writer, std::get<0>(findOrMakeReturnValue));
+    if(std::get<1>(findOrMakeReturnValue))
+    {
+        return;
+    }
+    value->write(writer, variableSet);
+}
+
+
 #endif // VARIABLE_SET_H_INCLUDED

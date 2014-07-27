@@ -27,8 +27,9 @@
 #include <memory>
 #include <list>
 #include <cmath>
+#include <functional>
 #include "util/string_cast.h"
-#include "util/dimension.h"
+#include "util/enum_traits.h"
 #ifdef DEBUG_STREAM
 #include <iostream>
 #define DUMP_V(fn, v) do {cerr << #fn << ": read " << v << endl;} while(false)
@@ -92,6 +93,9 @@ public:
     {
     }
 };
+
+typedef float float32_t;
+typedef double float64_t;
 
 class Reader
 {
@@ -173,29 +177,29 @@ public:
         DUMP_V(readS64, retval);
         return retval;
     }
-    float readF32()
+    float32_t readF32()
     {
-        static_assert(sizeof(float) == sizeof(uint32_t), "float is not 32 bits");
+        static_assert(sizeof(float32_t) == sizeof(uint32_t), "float32_t is not 32 bits");
         union
         {
             uint32_t ival;
-            float fval;
+            float32_t fval;
         };
         ival = readU32();
-        float retval = fval;
+        float32_t retval = fval;
         DUMP_V(readF32, retval);
         return retval;
     }
-    double readF64()
+    float64_t readF64()
     {
-        static_assert(sizeof(double) == sizeof(uint64_t), "double is not 64 bits");
+        static_assert(sizeof(float64_t) == sizeof(uint64_t), "float64_t is not 64 bits");
         union
         {
             uint64_t ival;
-            double fval;
+            float64_t fval;
         };
         ival = readU64();
-        double retval = fval;
+        float64_t retval = fval;
         DUMP_V(readF64, retval);
         return retval;
     }
@@ -295,35 +299,31 @@ public:
     {
         return limitAfterRead(readS64(), min, max);
     }
-    float readFiniteF32()
+    float32_t readFiniteF32()
     {
-        float retval = readF32();
+        float32_t retval = readF32();
         if(!isfinite(retval))
         {
             throw InvalidDataValueException("read value is not finite");
         }
         return retval;
     }
-    double readFiniteF64()
+    float64_t readFiniteF64()
     {
-        double retval = readF64();
+        float64_t retval = readF64();
         if(!isfinite(retval))
         {
             throw InvalidDataValueException("read value is not finite");
         }
         return retval;
     }
-    float readLimitedF32(float min, float max)
+    float32_t readLimitedF32(float32_t min, float32_t max)
     {
         return limitAfterRead(readFiniteF32(), min, max);
     }
-    double readLimitedF64(double min, double max)
+    float64_t readLimitedF64(float64_t min, float64_t max)
     {
         return limitAfterRead(readFiniteF64(), min, max);
-    }
-    Dimension readDimension()
-    {
-        return (Dimension)readLimitedU8(0, (uint8_t)Dimension::Last - 1);
     }
 };
 
@@ -382,24 +382,24 @@ public:
     {
         writeU64(v);
     }
-    void writeF32(float v)
+    void writeF32(float32_t v)
     {
-        static_assert(sizeof(float) == sizeof(uint32_t), "float is not 32 bits");
+        static_assert(sizeof(float32_t) == sizeof(uint32_t), "float is not 32 bits");
         union
         {
             uint32_t ival;
-            float fval;
+            float32_t fval;
         };
         fval = v;
         writeU32(ival);
     }
-    void writeF64(double v)
+    void writeF64(float64_t v)
     {
-        static_assert(sizeof(double) == sizeof(uint64_t), "double is not 64 bits");
+        static_assert(sizeof(float64_t) == sizeof(uint64_t), "double is not 64 bits");
         union
         {
             uint64_t ival;
-            double fval;
+            float64_t fval;
         };
         fval = v;
         writeU64(ival);
@@ -438,11 +438,113 @@ public:
         }
         writeU8(0);
     }
-    void writeDimension(Dimension v)
-    {
-        writeU8((uint8_t)v);
-    }
 };
+
+template <typename T>
+T read(Reader & reader);
+
+template <typename T>
+T read_limited(Reader & reader, T minV, T maxV);
+
+template <typename T>
+inline T read_finite(Reader & reader)
+{
+    return read<T>(reader);
+}
+
+template <typename T>
+inline T read_checked(Reader & reader, function<bool(T)> checkFn)
+{
+    T retval = read<T>(reader);
+    if(!checkFn(retval))
+    {
+        throw InvalidDataValueException("check failed in read_checked");
+    }
+    return retval;
+}
+
+template <typename T>
+void write(Writer &writer, T value);
+
+#define DEFINE_RW_FUNCTIONS_FOR_BASIC_INTEGER_TYPE(typeName, functionSuffix) \
+template <> \
+inline typeName read<typeName>(Reader & reader) \
+{ \
+    return reader.read ## functionSuffix(); \
+} \
+template <> \
+inline typeName read_limited<typeName>(Reader & reader, typeName minV, typeName maxV) \
+{ \
+    return reader.readLimited ## functionSuffix(); \
+} \
+template <> \
+inline void write<typeName>(Writer & writer, typeName value) \
+{ \
+    writer.write ## functionSuffix(value); \
+}
+
+#define DEFINE_RW_FUNCTIONS_FOR_BASIC_FLOAT_TYPE(typeName, functionSuffix) \
+template <> \
+inline typeName read<typeName>(Reader & reader) \
+{ \
+    return reader.read ## functionSuffix(); \
+} \
+template <> \
+inline typeName read_finite<typeName>(Reader & reader) \
+{ \
+    return reader.readFinite ## functionSuffix(); \
+} \
+template <> \
+inline typeName read_limited<typeName>(Reader & reader, typeName minV, typeName maxV) \
+{ \
+    return reader.readLimited ## functionSuffix(); \
+} \
+template <> \
+inline void write<typeName>(Writer & writer, typeName value) \
+{ \
+    writer.write ## functionSuffix(value); \
+}
+
+#define DEFINE_RW_FUNCTIONS_FOR_BASIC_TYPE(typeName, functionSuffix) \
+template <> \
+inline typeName read<typeName>(Reader & reader) \
+{ \
+    return reader.read ## functionSuffix(); \
+} \
+template <> \
+inline void write<typeName>(Writer & writer, typeName value) \
+{ \
+    writer.write ## functionSuffix(value); \
+}
+
+DEFINE_RW_FUNCTIONS_FOR_BASIC_INTEGER_TYPE(uint8_t, U8)
+DEFINE_RW_FUNCTIONS_FOR_BASIC_INTEGER_TYPE(int8_t, S8)
+DEFINE_RW_FUNCTIONS_FOR_BASIC_INTEGER_TYPE(uint16_t, U16)
+DEFINE_RW_FUNCTIONS_FOR_BASIC_INTEGER_TYPE(int16_t, S16)
+DEFINE_RW_FUNCTIONS_FOR_BASIC_INTEGER_TYPE(uint32_t, U32)
+DEFINE_RW_FUNCTIONS_FOR_BASIC_INTEGER_TYPE(int32_t, S32)
+DEFINE_RW_FUNCTIONS_FOR_BASIC_INTEGER_TYPE(uint64_t, U64)
+DEFINE_RW_FUNCTIONS_FOR_BASIC_INTEGER_TYPE(int64_t, S64)
+DEFINE_RW_FUNCTIONS_FOR_BASIC_FLOAT_TYPE(float32_t, F32)
+DEFINE_RW_FUNCTIONS_FOR_BASIC_FLOAT_TYPE(float64_t, F64)
+DEFINE_RW_FUNCTIONS_FOR_BASIC_TYPE(wstring, String)
+DEFINE_RW_FUNCTIONS_FOR_BASIC_TYPE(bool, Bool)
+
+#undef DEFINE_RW_FUNCTIONS_FOR_BASIC_INTEGER_TYPE
+#undef DEFINE_RW_FUNCTIONS_FOR_BASIC_FLOAT_TYPE
+#undef DEFINE_RW_FUNCTIONS_FOR_BASIC_TYPE
+
+template <typename T>
+inline T read(Reader & reader)
+{
+    return (T)read_limited<typename enum_traits<T>::rwtype>(reader, (enum_traits<T>::rwtype)enum_traits<T>::minimum, (enum_traits<T>::rwtype)enum_traits<T>::maximum);
+}
+
+template <typename T>
+inline write(Writer & writer, T value)
+{
+    write<typename enum_traits<T>::rwtype>(writer, (enum_traits<T>::rwtype)value);
+}
 
 class FileReader final : public Reader
 {
