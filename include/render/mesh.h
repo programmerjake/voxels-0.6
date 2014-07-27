@@ -27,7 +27,7 @@
 #include "texture/image.h"
 #include "texture/texture_descriptor.h"
 #include "stream/stream.h"
-#include "client.h"
+#include "util/variable_set.h"
 
 class Mesh_t;
 
@@ -141,14 +141,14 @@ private:
                             floatsPerColor = 4, colorsPerTriangle = 3,
                             floatsPerTextureCoord = 2, textureCoordsPerTriangle = 3;
     friend class Renderer;
-    Mesh_t(Reader &reader, Client &client)
+    Mesh_t(Reader &reader, VariableSet &variableSet)
     {
         DUMP_V(Mesh_t::Mesh_t, "reading mesh");
         length = reader.readU32();
         points.resize(floatsPerPoint * pointsPerTriangle * length);
         colors.resize(floatsPerColor * colorsPerTriangle * length);
         textureCoords.resize(floatsPerTextureCoord * textureCoordsPerTriangle * length);
-        textureInternal = Image::read(reader, client);
+        textureInternal = Image::read(reader, variableSet);
         DUMP_V(Mesh_t::Mesh_t, "reading mesh : read texture");
         for(float & v : points)
         {
@@ -486,9 +486,9 @@ public:
         add(m2);
     }
 
-    friend void writeMesh(Mesh mesh, Writer &writer, Client &client);
+    friend void writeMesh(Mesh mesh, Writer &writer, VariableSet &variableSet);
 
-    friend Mesh readMesh(Reader &reader, Client &client);
+    friend Mesh readMesh(Reader &reader, VariableSet &variableSet);
     friend Mesh interpolateColors(Mesh dest, Mesh mesh, Color cNXNYNZ, Color cNXNYPZ, Color cNXPYNZ, Color cNXPYPZ, Color cPXNYNZ, Color cPXNYPZ, Color cPXPYNZ, Color cPXPYPZ);
     friend Mesh interpolateColors(Mesh mesh, Color cNXNYNZ, Color cNXNYPZ, Color cNXPYNZ, Color cNXPYPZ, Color cPXNYNZ, Color cPXNYPZ, Color cPXPYNZ, Color cPXPYPZ);
     friend Mesh lightColors(Mesh dest, Mesh mesh, VectorF lightDir, float ambient, float diffuse);
@@ -586,11 +586,11 @@ inline Mesh lightColors(Mesh mesh, VectorF lightDir, float ambient, float diffus
     return Mesh(new Mesh_t(mesh->texture(), triangles));
 }
 
-inline void writeMesh(Mesh mesh, Writer &writer, Client &client)
+inline void writeMesh(Mesh mesh, Writer &writer, VariableSet &variableSet)
 {
     assert(mesh && (uint32_t)mesh->size() == mesh->size());
     writer.writeU32(mesh->size());
-    mesh->texture().write(writer, client);
+    mesh->texture().write(writer, variableSet);
     for(float v : mesh->points)
     {
         writer.writeF32(v);
@@ -605,9 +605,9 @@ inline void writeMesh(Mesh mesh, Writer &writer, Client &client)
     }
 }
 
-inline Mesh readMesh(Reader &reader, Client &client)
+inline Mesh readMesh(Reader &reader, VariableSet &variableSet)
 {
-    return Mesh(new Mesh_t(reader, client));
+    return Mesh(new Mesh_t(reader, variableSet));
 }
 
 inline TransformedMesh::operator Mesh() const

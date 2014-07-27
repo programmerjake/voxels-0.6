@@ -15,7 +15,7 @@
  * MA 02110-1301, USA.
  *
  */
-#include "util.h"
+#include "util/util.h"
 #include <chrono>
 #include <iostream>
 #include <cstdlib>
@@ -29,6 +29,7 @@ uint32_t makeSeed()
 }
 
 #if 0 // testing balanced_tree
+#include "util/balanced_tree.h"
 namespace
 {
 initializer init1([]()
@@ -71,6 +72,7 @@ initializer init1([]()
 }
 #endif // testing balanced_tree
 #if 0 // testing solveCubic
+#include "util/solve.h"
 namespace
 {
 void writeCubic(float a, float b, float c, float d)

@@ -9,7 +9,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <sstream>
-#include "util/util.h"
+#include "util/circular_deque.h"
 #include "decoder/ogg_vorbis_decoder.h"
 
 using namespace std;

@@ -18,8 +18,8 @@
 #ifndef TEXTURE_DESCRIPTOR_H_INCLUDED
 #define TEXTURE_DESCRIPTOR_H_INCLUDED
 
-#include "image.h"
-#include "util.h"
+#include "texture/image.h"
+#include "util/util.h"
 
 struct TextureDescriptor
 {

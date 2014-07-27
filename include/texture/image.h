@@ -26,7 +26,7 @@
 #include <memory>
 #include "util/color.h"
 #include "stream/stream.h"
-#include "client.h"
+#include "util/variable_set.h"
 
 using namespace std;
 
@@ -79,8 +79,8 @@ public:
     {
         return l.data != r.data;
     }
-    void write(Writer &writer, Client &client) const;
-    static Image read(Reader &reader, Client &client);
+    void write(Writer &writer, VariableSet &variableSet) const;
+    static Image read(Reader &reader, VariableSet &variableSet);
 private:
     enum RowOrder
     {

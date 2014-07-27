@@ -26,7 +26,8 @@
 #include <cstring>
 #include <memory>
 #include <list>
-#include "util/util.h"
+#include <cmath>
+#include "util/string_cast.h"
 #include "util/dimension.h"
 #ifdef DEBUG_STREAM
 #include <iostream>
@@ -450,7 +451,7 @@ private:
 public:
     FileReader(wstring fileName)
     {
-        string str = wcsrtombs(fileName);
+        string str = string_cast<string>(fileName);
         f = fopen(str.c_str(), "rb");
         if(f == nullptr)
             throw IOException(string("IO Error : ") + strerror(errno));
@@ -484,7 +485,7 @@ private:
 public:
     FileWriter(wstring fileName)
     {
-        string str = wcsrtombs(fileName);
+        string str = string_cast<string>(fileName);
         f = fopen(str.c_str(), "wb");
         if(f == nullptr)
             throw IOException(string("IO Error : ") + strerror(errno));

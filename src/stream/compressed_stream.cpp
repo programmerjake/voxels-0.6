@@ -15,8 +15,8 @@
  * MA 02110-1301, USA.
  *
  */
-#include "compressed_stream.h"
-#include "util.h"
+#include "stream/compressed_stream.h"
+#include "util/util.h"
 #include <iostream>
 #include <cstdlib>
 #include <thread>

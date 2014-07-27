@@ -15,7 +15,7 @@
  * MA 02110-1301, USA.
  *
  */
-#include "texture_atlas.h"
+#include "texture/texture_atlas.h"
 #include <iostream>
 #include <cstdlib>
 

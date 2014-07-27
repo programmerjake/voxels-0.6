@@ -15,4 +15,4 @@
  * MA 02110-1301, USA.
  *
  */
-#include "matrix.h"
+#include "util/matrix.h"

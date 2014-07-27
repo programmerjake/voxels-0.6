@@ -19,8 +19,11 @@
 #define COMPRESSED_STREAM_H_INCLUDED
 
 #include <deque>
-#include "stream.h"
+#include "stream/stream.h"
+#include "util/circular_deque.h"
 #include <iostream>
+
+using namespace std;
 
 class LZ77FormatException final : public IOException
 {

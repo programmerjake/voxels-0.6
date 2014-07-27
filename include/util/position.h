@@ -23,6 +23,9 @@
 #include "util.h"
 #include <unordered_set>
 #include <vector>
+#include <list>
+
+using namespace std;
 
 struct PositionI : public VectorI
 {

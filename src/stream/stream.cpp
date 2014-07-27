@@ -15,14 +15,14 @@
  * MA 02110-1301, USA.
  *
  */
-#include "stream.h"
+#include "stream/stream.h"
 #include <sys/types.h>
 #include <unistd.h>
 #include <iostream>
 #include <mutex>
 #include <condition_variable>
 #include <queue>
-#include "util.h"
+#include "util/circular_deque.h"
 
 using namespace std;
 

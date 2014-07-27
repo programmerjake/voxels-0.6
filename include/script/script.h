@@ -23,7 +23,7 @@
 #include "stream/stream.h"
 #include "render/mesh.h"
 #include <unordered_map>
-#include "client.h"
+#include "util/variable_set.h"
 #include <sstream>
 #include <cmath>
 #include <iostream>
@@ -457,7 +457,7 @@ namespace Scripting
     {
         shared_ptr<Data> data;
         ScriptException(shared_ptr<Data> data)
-            : runtime_error(wcsrtombs((wstring)*data)), data(data)
+            : runtime_error(string_cast<string>((wstring)*data)), data(data)
         {
         }
         ScriptException(wstring str)

@@ -15,8 +15,8 @@
  * MA 02110-1301, USA.
  *
  */
-#include "network.h"
-#include "util.h"
+#include "stream/network.h"
+#include "util/util.h"
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -82,7 +82,7 @@ public:
 
 NetworkConnection::NetworkConnection(wstring url, uint16_t port)
 {
-    string url_utf8 = wcsrtombs(url), port_str = to_string((unsigned)port);
+    string url_utf8 = string_cast<string>(url), port_str = to_string((unsigned)port);
     addrinfo *addrList = nullptr;
     addrinfo hints;
     memset(&hints, 0, sizeof(hints));

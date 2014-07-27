@@ -995,10 +995,10 @@ inline bool PhysicsObject::isSupportedBy(const PhysicsObject & rt) const
 
 inline void PhysicsObject::setCurrentState(PositionF newPosition, VectorF newVelocity)
 {
-    auto i = world->getOldVariableSetIndex();
+    auto i = world.lock()->getOldVariableSetIndex();
     position[i] = newPosition;
     velocity[i] = newVelocity;
-    objectTime[i] = world->getCurrentTime();
+    objectTime[i] = world.lock()->getCurrentTime();
 }
 
 #endif // PHYSICS_OBJECT_H_INCLUDED

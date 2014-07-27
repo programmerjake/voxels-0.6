@@ -21,6 +21,7 @@
 #include "util/matrix.h"
 #include "util/vector.h"
 #include "util/game_version.h"
+#include "util/string_cast.h"
 #include <cwchar>
 #include <string>
 #include <iostream>
@@ -44,6 +45,14 @@ double Display::realtimeTimer()
 
 namespace
 {
+struct RWOpsException : public IOException
+{
+    RWOpsException(string str)
+        : IOException(str)
+    {
+    }
+};
+
 class RWOpsReader final : public Reader
 {
 private:
@@ -53,7 +62,7 @@ public:
         : rw(rw)
     {
         if(rw == nullptr)
-            throw IOException("invalid RWOps");
+            throw RWOpsException("invalid RWOps");
     }
     virtual uint8_t readByte() override
     {
@@ -63,7 +72,7 @@ public:
         {
             const char * str = SDL_GetError();
             if(str[0]) // non-empty string : error
-                throw IOException(str);
+                throw RWOpsException(str);
             throw EOFException();
         }
         return retval;
@@ -118,7 +127,7 @@ static wstring getExecutablePath()
         throw runtime_error(string("can't get executable path : ") + strerror(errno));
     }
     buf[rv] = '\0';
-    return mbsrtowcs(&buf[0]);
+    return string_cast<wstring>(&buf[0]);
 }
 
 static void calcResourcePrefix()
@@ -137,8 +146,15 @@ static void calcResourcePrefix()
 shared_ptr<Reader> getResourceReader(wstring resource)
 {
     startSDL();
-    string fname = wcsrtombs(getResourceFileName(resource));
-    return make_shared<RWOpsReader>(SDL_RWFromFile(fname.c_str(), "rb"));
+    string fname = string_cast<string>(getResourceFileName(resource));
+    try
+    {
+        return make_shared<RWOpsReader>(SDL_RWFromFile(fname.c_str(), "rb"));
+    }
+    catch(RWOpsException & e)
+    {
+        throw RWOpsException("can't open resource : " + string_cast<string>(resource));
+    }
 }
 #elif __unix
 #error implement getResourceReader for other unix
@@ -882,12 +898,12 @@ void glLoadMatrix(Matrix mat)
 
 wstring Display::title()
 {
-    return mbsrtowcs(SDL_GetWindowTitle(window));
+    return string_cast<wstring>(SDL_GetWindowTitle(window));
 }
 
 void Display::title(wstring newTitle)
 {
-    string s = wcsrtombs(newTitle);
+    string s = string_cast<string>(newTitle);
     SDL_SetWindowTitle(window, s.c_str());
 }
 

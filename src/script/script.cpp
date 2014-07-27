@@ -45,7 +45,7 @@ struct Parser
     {
         wostringstream os;
         os << L"parse error : Line " << tokLine << L" Column " << tokCol << L" : " << msg;
-        throw runtime_error(wcsrtombs(os.str()));
+        throw runtime_error(string_cast<string>(os.str()));
     }
     void getChar()
     {

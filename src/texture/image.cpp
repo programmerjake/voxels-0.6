@@ -15,9 +15,9 @@
  * MA 02110-1301, USA.
  *
  */
-#include "image.h"
-#include "png_decoder.h"
-#include "platform.h"
+#include "texture/image.h"
+#include "decoder/png_decoder.h"
+#include "platform/platform.h"
 #include <cstring>
 #include <iostream>
 
@@ -211,25 +211,20 @@ void Image::copyOnWrite()
     data->lock.lock();
 }
 
-void Image::write(Writer &writer, Client &client) const
+void Image::write(Writer &writer, VariableSet &variableSet) const
 {
     if(!*this)
     {
-        Client::writeId(writer, Client::NullId);
+        VariableSet::Descriptor<data_t>::null().write(writer);
         return;
     }
-    client.lock();
-    Client::IdType id = client.getId(data, Client::DataType::Image);
-    if(id != Client::NullId)
+    pair<VariableSet::Descriptor<data_t>, bool> findOrMakeReturnValue = variableSet.findOrMake<data_t>(data);
+    get<0>(findOrMakeReturnValue).write(writer);
+    if(get<1>(findOrMakeReturnValue))
     {
-        client.unlock();
-        Client::writeId(writer, id);
         return;
     }
     cout << "Server : writing image\n";
-    id = client.makeId(data, Client::DataType::Image);
-    client.unlock();
-    Client::writeId(writer, id);
     writer.writeU32(width());
     writer.writeU32(height());
     vector<uint8_t> row;
@@ -259,13 +254,13 @@ void Image::write(Writer &writer, Client &client) const
     }
 }
 
-Image Image::read(Reader &reader, Client &client)
+Image Image::read(Reader &reader, VariableSet &variableSet)
 {
-    Client::IdType id = Client::readId(reader);
-    if(id == Client::NullId)
+    VariableSet::Descriptor<data_t> descriptor = VariableSet::Descriptor<data_t>::read(reader);
+    if(!descriptor)
         return Image(nullptr);
     Image retval;
-    retval.data = client.getPtr<Image::data_t>(id, Client::DataType::Image);
+    retval.data = variableSet.get(descriptor);
     if(retval.data != nullptr)
     {
         DUMP_V(Image::read, "read old image");
@@ -282,7 +277,7 @@ Image Image::read(Reader &reader, Client &client)
     {
         retval.data->data[i] = reader.readU8();
     }
-    client.setPtr(retval.data, id, Client::DataType::Image);
+    variableSet.set(descriptor, retval.data);
     return retval;
 }
 
