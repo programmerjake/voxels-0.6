@@ -75,14 +75,14 @@ public:
     }
 };
 
-template <>
-inline PhysicsConstraint read<PhysicsConstraint>(Reader &reader, VariableSet &variableSet)
+template <typename T, typename std::enable_if<std::is_same<PhysicsConstraint, T>::value, int>::type = 0>
+inline PhysicsConstraint read(Reader &reader, VariableSet &variableSet)
 {
     return PhysicsConstraint(read<Script>(reader, variableSet));
 }
 
-template <>
-inline void write<PhysicsConstraint>(Writer &writer, VariableSet &variableSet, PhysicsConstraint value)
+template <typename T, typename std::enable_if<std::is_same<PhysicsConstraint, T>::value, int>::type = 0>
+inline void write(Writer &writer, VariableSet &variableSet, PhysicsConstraint value)
 {
     write<Script>(writer, variableSet, value.getScript());
 }
@@ -270,7 +270,7 @@ public:
 class PhysicsObjectConstructor final : public enable_shared_from_this<PhysicsObjectConstructor>
 {
     typedef function<shared_ptr<PhysicsObject>(PositionF position, VectorF velocity, shared_ptr<PhysicsWorld> world)> makeFnType;
-    typedef function<void(Writer & writer)> writeFnType;
+    typedef function<void(Writer & writer, VariableSet &variableSet)> writeFnType;
 public:
     const makeFnType make;
     const writeFnType write;
@@ -286,19 +286,19 @@ private:
 public:
     static shared_ptr<PhysicsObjectConstructor> cylinderMaker(float radius, float yExtent, bool affectedByGravity, bool isStatic, PhysicsProperties properties, vector<PhysicsConstraint> constraints)
     {
-        auto write = [=](Writer & writer)
+        auto write = [=](Writer & writer, VariableSet &variableSet)
         {
-            writer.writeU8(CylinderShape);
-            writer.writeF32(radius);
-            writer.writeF32(yExtent);
-            writer.writeBool(affectedByGravity);
-            writer.writeBool(isStatic);
-            properties.write(writer);
+            ::write<uint8_t>(writer, CylinderShape);
+            ::write<float32_t>(writer, radius);
+            ::write<float32_t>(writer, yExtent);
+            ::write<bool>(writer, affectedByGravity);
+            ::write<bool>(writer, isStatic);
+            ::write<PhysicsProperties>(writer, properties);
             assert(constraints.size() < 0x100); // fits in a uint8_t
-            writer.writeU8(constraints.size());
+            ::write<uint8_t>(writer, constraints.size());
             for(auto constraint : constraints)
             {
-                constraint.write(writer);
+                ::write<PhysicsConstraint>(writer, variableSet, constraint);
             }
         };
         auto make = [=](PositionF position, VectorF velocity, shared_ptr<PhysicsWorld> world)->shared_ptr<PhysicsObject>
@@ -311,20 +311,18 @@ public:
     }
     static shared_ptr<PhysicsObjectConstructor> boxMaker(VectorF extents, bool affectedByGravity, bool isStatic, PhysicsProperties properties, vector<PhysicsConstraint> constraints)
     {
-        auto write = [=](Writer & writer)
+        auto write = [=](Writer & writer, VariableSet &variableSet)
         {
-            writer.writeU8(BoxShape);
-            writer.writeF32(extents.x);
-            writer.writeF32(extents.y);
-            writer.writeF32(extents.z);
-            writer.writeBool(affectedByGravity);
-            writer.writeBool(isStatic);
-            properties.write(writer);
+            ::write<uint8_t>(writer, BoxShape);
+            ::write<VectorF>(writer, extents);
+            ::write<bool>(writer, affectedByGravity);
+            ::write<bool>(writer, isStatic);
+            ::write<PhysicsProperties>(writer, properties);
             assert(constraints.size() < 0x100); // fits in a uint8_t
-            writer.writeU8(constraints.size());
+            ::write<uint8_t>(writer, constraints.size());
             for(auto constraint : constraints)
             {
-                constraint.write(writer);
+                ::write<PhysicsConstraint>(writer, variableSet, constraint);
             }
         };
         auto make = [=](PositionF position, VectorF velocity, shared_ptr<PhysicsWorld> world)->shared_ptr<PhysicsObject>
@@ -337,9 +335,9 @@ public:
     }
     static shared_ptr<PhysicsObjectConstructor> empty()
     {
-        auto write = [](Writer & writer)
+        auto write = [](Writer & writer, VariableSet &)
         {
-            writer.writeU8(EmptyShape);
+            ::write<uint8_t>(writer, EmptyShape);
         };
         auto make = [](PositionF position, VectorF velocity, shared_ptr<PhysicsWorld> world)->shared_ptr<PhysicsObject>
         {
@@ -349,40 +347,40 @@ public:
     }
     static shared_ptr<PhysicsObjectConstructor> read(Reader & reader)
     {
-        uint8_t shape = reader.readLimitedU8(0, LastShape - 1);
+        uint8_t shape = ::read_limited<uint8_t>(reader, 0, LastShape - 1);
         switch(shape)
         {
         case BoxShape:
         {
             VectorF extents;
-            extents.x = reader.readLimitedF32(PhysicsWorld::distanceEPS, 100);
-            extents.y = reader.readLimitedF32(PhysicsWorld::distanceEPS, 100);
-            extents.z = reader.readLimitedF32(PhysicsWorld::distanceEPS, 100);
-            bool affectedByGravity = reader.readBool();
-            bool isStatic = reader.readBool();
-            PhysicsProperties properties = PhysicsProperties::read(reader);
+            extents.x = ::read_limited<float32_t>(reader, PhysicsWorld::distanceEPS, 100);
+            extents.y = ::read_limited<float32_t>(reader, PhysicsWorld::distanceEPS, 100);
+            extents.z = ::read_limited<float32_t>(reader, PhysicsWorld::distanceEPS, 100);
+            bool affectedByGravity = ::read<bool>(reader);
+            bool isStatic = ::read<bool>(reader);
+            PhysicsProperties properties = ::read<PhysicsProperties>(reader);
             vector<PhysicsConstraint> constraints;
-            size_t size = reader.readU8();
+            size_t size = ::read<uint8_t>(reader);
             constraints.reserve(size);
             for(size_t i = 0; i < size; i++)
             {
-                constraints[i] = PhysicsConstraint::read(reader);
+                constraints[i] = ::read<PhysicsConstraint>(reader);
             }
             return boxMaker(extents, affectedByGravity, isStatic, properties, constraints);
         }
         case CylinderShape:
         {
-            float radius = reader.readLimitedF32(PhysicsWorld::distanceEPS, 100);;
-            float yExtent = reader.readLimitedF32(PhysicsWorld::distanceEPS, 100);;
-            bool affectedByGravity = reader.readBool();
-            bool isStatic = reader.readBool();
-            PhysicsProperties properties = PhysicsProperties::read(reader);
+            float radius = ::read_limited<float32_t>(reader, PhysicsWorld::distanceEPS, 100);
+            float yExtent = ::read_limited<float32_t>(reader, PhysicsWorld::distanceEPS, 100);
+            bool affectedByGravity = ::read<bool>(reader);
+            bool isStatic = ::read<bool>(reader);
+            PhysicsProperties properties = ::read<PhysicsProperties>(reader);
             vector<PhysicsConstraint> constraints;
-            size_t size = reader.readU8();
+            size_t size = ::read<uint8_t>(reader);
             constraints.reserve(size);
             for(size_t i = 0; i < size; i++)
             {
-                constraints[i] = PhysicsConstraint::read(reader);
+                constraints[i] = ::read<PhysicsConstraint>(reader);
             }
             return cylinderMaker(radius, yExtent, affectedByGravity, isStatic, properties, constraints);
         }

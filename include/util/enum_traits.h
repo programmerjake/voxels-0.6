@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <iterator>
+#include <type_traits>
 
 using namespace std;
 
@@ -98,11 +99,11 @@ struct enum_iterator : public std::iterator<std::random_access_iterator_tag, T>
     }
 };
 
-template <typename T, typename RWType, T minV, T maxV>
+template <typename T, T minV, T maxV>
 struct enum_traits_default
 {
-    typedef T type;
-    typedef RWType rwtype;
+    typedef typename std::enable_if<std::is_enum<T>::value, T>::type type;
+    typedef typename std::underlying_type<T>::type rwtype;
     static constexpr T minimum = minV;
     static constexpr T maximum = maxV;
     static constexpr enum_iterator<T> begin()
@@ -113,6 +114,19 @@ struct enum_traits_default
     {
         return enum_iterator<T>(maximum) + 1;
     }
+    static constexpr size_t size()
+    {
+        return end() - begin();
+    }
 };
+
+template <typename T>
+struct enum_traits : public enum_traits_default<typename std::enable_if<std::is_enum<T>::value, T>::type, T::enum_first, T::enum_last>
+{
+};
+
+#define DEFINE_ENUM_LIMITS(first, last) \
+enum_first = first, \
+enum_last = last,
 
 #endif // ENUM_TRAITS_H_INCLUDED

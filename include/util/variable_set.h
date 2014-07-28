@@ -38,7 +38,7 @@ private:
         }
     };
     unordered_map<size_t, shared_ptr<VariableBase>> variables;
-    unordered_map<const void *, size_t> reverseMap;
+    unordered_map<const void *, pair<size_t, weak_ptr<void>>> reverseMap;
 public:
     template <typename T>
     class Descriptor final : public VariableDescriptorBase
@@ -111,7 +111,7 @@ public:
                 retval = false;
             }
             descriptor.unwrap(variable) = value;
-            reverseMap[static_cast<const void *>(value.get())] = descriptor.descriptorIndex;
+            reverseMap[static_cast<const void *>(value.get())] = make_pair(descriptor.descriptorIndex, weak_ptr<void>(static_pointer_cast<void>(value)));
             return retval;
         }
     }
@@ -122,7 +122,12 @@ public:
         auto iter = reverseMap.find(static_cast<const void *>(value.get()));
         if(iter == reverseMap.end())
             return Descriptor<T>::null();
-        return Descriptor<T>(std::get<1>(*iter));
+        if(std::get<1>(std::get<1>(*iter)).expired())
+        {
+            reverseMap.erase(iter);
+            return Descriptor<T>::null();
+        }
+        return Descriptor<T>(std::get<0>(std::get<1>(*iter)));
     }
     template <typename T>
     pair<Descriptor<T>, bool> findOrMake(shared_ptr<T> value)
@@ -134,21 +139,10 @@ public:
             Descriptor<T> descriptor;
             return make_pair(descriptor, set<T>(descriptor, value));
         }
-        return make_pair(Descriptor<T>(std::get<1>(*iter)), true);
+        std::get<1>(std::get<1>(*iter)) = value;
+        return make_pair(Descriptor<T>(std::get<0>(std::get<1>(*iter))), true);
     }
 };
-
-template <typename T>
-inline VariableSet::Descriptor<T> read<VariableSet::Descriptor<T>>(Reader &reader)
-{
-    return VariableSet::Descriptor<T>::read(reader);
-}
-
-template <typename T>
-inline void write<VariableSet::Descriptor<T>>(Writer &writer, VariableSet::Descriptor<T> value)
-{
-    value.write(writer);
-}
 
 template <typename T>
 inline shared_ptr<T> read(Reader &reader, VariableSet &variableSet)
@@ -157,7 +151,8 @@ inline shared_ptr<T> read(Reader &reader, VariableSet &variableSet)
     if(!descriptor)
         return nullptr;
     shared_ptr<T> retval = variableSet.get(descriptor);
-    if(retval != nullptr)
+    bool modified = read<bool>(reader);
+    if(retval != nullptr && !modified)
         return retval;
     retval = T::read(reader, variableSet);
     variableSet.set(descriptor, retval);
@@ -165,7 +160,7 @@ inline shared_ptr<T> read(Reader &reader, VariableSet &variableSet)
 }
 
 template <typename T>
-inline void write(Writer &writer, VariableSet &variableSet, shared_ptr<T> value)
+inline void write(Writer &writer, VariableSet &variableSet, shared_ptr<T> value, bool modified = false)
 {
     if(value == nullptr)
     {
@@ -174,7 +169,8 @@ inline void write(Writer &writer, VariableSet &variableSet, shared_ptr<T> value)
     }
     pair<VariableSet::Descriptor<T>, bool> findOrMakeReturnValue = variableSet.findOrMake<T>(value);
     write<VariableSet::Descriptor<T>>(writer, std::get<0>(findOrMakeReturnValue));
-    if(std::get<1>(findOrMakeReturnValue))
+    write<bool>(writer, modified || !std::get<1>(findOrMakeReturnValue));
+    if(std::get<1>(findOrMakeReturnValue) && !modified)
     {
         return;
     }

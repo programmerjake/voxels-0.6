@@ -24,79 +24,140 @@
 
 using namespace std;
 
-struct Color final
+struct ColorI final
 {
+    uint8_t b, g, r, a;
+    friend constexpr ColorI RGBAI(int r, int g, int b, int a);
+    friend struct ColorF;
+private:
+    constexpr ColorI(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+        : b(b), g(g), r(r), a(a)
+    {
+    }
+    union ConvertWithUInt32
+    {
+        uint32_t v;
+        struct
+        {
+            uint8_t b, g, r, a;
+        };
+        constexpr ConvertWithUInt32(uint32_t v)
+            : v(v)
+        {
+        }
+        constexpr ConvertWithUInt32(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+            : b(b), g(g), r(r), a(a)
+        {
+        }
+    };
+public:
+    constexpr ColorI()
+        : b(0), g(0), r(0), a(0)
+    {
+    }
+    explicit constexpr ColorI(uint32_t v)
+        : b(ConvertWithUInt32(v).b), g(ConvertWithUInt32(v).g), r(ConvertWithUInt32(v).r), a(ConvertWithUInt32(v).a)
+    {
+
+    }
+    explicit constexpr operator uint32_t() const
+    {
+        return ConvertWithUInt32(r, g, b, a).v;
+    }
+};
+
+constexpr ColorI RGBAI(int r, int g, int b, int a)
+{
+    return ColorI((uint8_t)limit<int>(r, 0, 0xFF), (uint8_t)limit<int>(g, 0, 0xFF), (uint8_t)limit<int>(b, 0, 0xFF), (uint8_t)limit<int>(a, 0, 0xFF));
+}
+
+constexpr ColorI RGBI(int r, int g, int b)
+{
+    return RGBAI(r, g, b, 0xFF);
+}
+
+constexpr ColorI scaleI(ColorI l, ColorI r)
+{
+    return RGBAI(l.r * r.r / 0xFF, l.g * r.g / 0xFF, l.b * r.b / 0xFF, l.a * r.a / 0xFF);
+}
+
+constexpr ColorI scaleI(int l, ColorI r)
+{
+    return RGBAI(l * r.r / 0xFF, l * r.g / 0xFF, l * r.b / 0xFF, r.a);
+}
+
+constexpr ColorI scaleI(ColorI l, int r)
+{
+    return RGBAI(l.r * r / 0xFF, l.g * r / 0xFF, l.b * r / 0xFF, l.a);
+}
+
+struct ColorF final
+{
+    friend constexpr ColorF RGBAF(float r, float g, float b, float a);
     float r, g, b, a; /// a is opacity -- 0 is transparent and 1 is opaque
-    Color(float v, float a = 1)
+private:
+    constexpr ColorF(float r, float g, float b, float a)
+        : r(r), g(g), b(b), a(a)
     {
-        r = g = b = v;
-        this->a = a;
     }
-    Color()
+public:
+    constexpr ColorF()
+        : r(0), g(0), b(0), a(0)
     {
-        r = g = b = a = 0;
     }
-    Color(float r, float g, float b, float a = 1)
+    explicit constexpr ColorF(ColorI c)
+        : r((int)c.r * ((float)1 / 0xFF)), g((int)c.g * ((float)1 / 0xFF)), b((int)c.b * ((float)1 / 0xFF)), a((int)c.a * ((float)1 / 0xFF))
     {
-        this->r = r;
-        this->g = g;
-        this->b = b;
-        this->a = a;
     }
-    uint8_t ri() const
+    explicit constexpr operator ColorI() const
     {
-        return ifloor(limit(r * 256.0f, 0.0f, 255.0f));
+        return ColorI((int)limit<float>(r * 0xFF, 0, 0xFF), (int)limit<float>(g * 0xFF, 0, 0xFF), (int)limit<float>(b * 0xFF, 0, 0xFF), (int)limit<float>(a * 0xFF, 0, 0xFF));
     }
-    uint8_t gi() const
-    {
-        return ifloor(limit(g * 256.0f, 0.0f, 255.0f));
-    }
-    uint8_t bi() const
-    {
-        return ifloor(limit(b * 256.0f, 0.0f, 255.0f));
-    }
-    uint8_t ai() const
-    {
-        return ifloor(limit(a * 256.0f, 0.0f, 255.0f));
-    }
-    void ri(uint8_t v)
-    {
-        r = (unsigned)v * (1.0f / 255.0f);
-    }
-    void gi(uint8_t v)
-    {
-        g = (unsigned)v * (1.0f / 255.0f);
-    }
-    void bi(uint8_t v)
-    {
-        b = (unsigned)v * (1.0f / 255.0f);
-    }
-    void ai(uint8_t v)
-    {
-        a = (unsigned)v * (1.0f / 255.0f);
-    }
-    friend Color scale(Color l, Color r)
-    {
-        return Color(l.r * r.r, l.g * r.g, l.b * r.b, l.a * r.a);
-    }
-    friend Color scale(float l, Color r)
-    {
-        return Color(l * r.r, l * r.g, l * r.b, r.a);
-    }
-    friend Color scale(Color l, float r)
-    {
-        return Color(l.r * r, l.g * r, l.b * r, l.a);
-    }
-    friend ostream & operator <<(ostream & os, const Color & c)
+    friend ostream & operator <<(ostream & os, const ColorF & c)
     {
         return os << "RGBA(" << c.r << ", " << c.g << ", " << c.b << ", " << c.a << ")";
     }
 };
 
-template <>
-inline const Color interpolate<Color>(const float t, const Color a, const Color b)
+constexpr ColorF RGBAF(float r, float g, float b, float a)
 {
-    return Color(interpolate(t, a.r, b.r), interpolate(t, a.g, b.g), interpolate(t, a.b, b.b), interpolate(t, a.a, b.a));
+    return ColorF(r, g, b, a);
+}
+
+constexpr ColorF RGBF(float r, float g, float b)
+{
+    return RGBAF(r, g, b, 1);
+}
+
+constexpr ColorF scaleF(ColorF l, ColorF r)
+{
+    return RGBAF(l.r * r.r, l.g * r.g, l.b * r.b, l.a * r.a);
+}
+
+constexpr ColorF scaleF(float l, ColorF r)
+{
+    return RGBAF(l * r.r, l * r.g, l * r.b, r.a);
+}
+
+constexpr ColorF scaleF(ColorF l, float r)
+{
+    return RGBAF(l.r * r, l.g * r, l.b * r, l.a);
+}
+
+constexpr ColorF colorize(ColorF color, ColorF v)
+{
+    return scaleF(color, v);
+}
+
+constexpr ColorI colorize(ColorF color, ColorI v)
+{
+    return RGBAI((int)((int)v.r * color.r), (int)((int)v.g * color.g), (int)((int)v.b * color.b), (int)((int)v.a * color.a));
+}
+
+template <>
+constexpr ColorF interpolate<ColorF>(const float t, const ColorF a, const ColorF b)
+{
+    return RGBAF(interpolate(t, a.r, b.r), interpolate(t, a.g, b.g), interpolate(t, a.b, b.b), interpolate(t, a.a, b.a));
 }
 
 #endif // COLOR_H_INCLUDED

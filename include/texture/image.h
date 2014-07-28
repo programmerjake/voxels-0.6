@@ -24,6 +24,7 @@
 #include <stdexcept>
 #include <mutex>
 #include <memory>
+#include <type_traits>
 #include "util/color.h"
 #include "stream/stream.h"
 #include "util/variable_set.h"
@@ -44,15 +45,15 @@ class Image final
 public:
     explicit Image(wstring resourceName);
     explicit Image(unsigned w, unsigned h);
-    explicit Image(Color c);
+    explicit Image(ColorI c);
     Image();
     Image(nullptr_t)
         : Image()
     {
     }
 
-    void setPixel(int x, int y, Color c);
-    Color getPixel(int x, int y) const;
+    void setPixel(int x, int y, ColorI c);
+    ColorI getPixel(int x, int y) const;
     void bind() const;
     static void unbind();
     unsigned width() const
@@ -112,14 +113,14 @@ private:
     void copyOnWrite();
 };
 
-template <>
-inline Image read<Image>(Reader &reader, VariableSet &variableSet)
+template <typename T, typename std::enable_if<std::is_same<Image, T>::value, int>::type = 0>
+inline Image read(Reader &reader, VariableSet &variableSet)
 {
     return Image::read(reader, variableSet);
 }
 
-template <>
-inline void write<Image>(Writer &writer, VariableSet &variableSet, Image value)
+template <typename T, typename std::enable_if<std::is_same<Image, T>::value, int>::type = 0>
+inline void write(Writer &writer, VariableSet &variableSet, Image value)
 {
     value.write(writer, variableSet);
 }

@@ -1031,3 +1031,47 @@ VectorF Display::transformMouseTo3D(float x, float y, float depth)
 {
     return VectorF(depth * scaleX() * (2 * x / width() - 1), depth * scaleY() * (1 - 2 * y / height()), -depth);
 }
+
+void Display::render(const Mesh &m)
+{
+    static vector<float> vertexArray, textureCoordArray, colorArray;
+    m.image.bind();
+    vertexArray.resize(m.triangles.size() * 3 * 3);
+    textureCoordArray.resize(m.triangles.size() * 3 * 2);
+    colorArray.resize(m.triangles.size() * 3 * 4);
+    for(size_t i = 0; i < m.triangles.size(); i++)
+    {
+        Triangle tri = m.triangles[i];
+        vertexArray[i * 3 * 3 + 0 * 3 + 0] = tri.p1.x;
+        vertexArray[i * 3 * 3 + 0 * 3 + 1] = tri.p1.y;
+        vertexArray[i * 3 * 3 + 0 * 3 + 2] = tri.p1.z;
+        vertexArray[i * 3 * 3 + 1 * 3 + 0] = tri.p2.x;
+        vertexArray[i * 3 * 3 + 1 * 3 + 1] = tri.p2.y;
+        vertexArray[i * 3 * 3 + 1 * 3 + 2] = tri.p2.z;
+        vertexArray[i * 3 * 3 + 2 * 3 + 0] = tri.p3.x;
+        vertexArray[i * 3 * 3 + 2 * 3 + 1] = tri.p3.y;
+        vertexArray[i * 3 * 3 + 2 * 3 + 2] = tri.p3.z;
+        textureCoordArray[i * 3 * 2 + 0 * 2 + 0] = tri.t1.u;
+        textureCoordArray[i * 3 * 2 + 0 * 2 + 1] = tri.t1.v;
+        textureCoordArray[i * 3 * 2 + 1 * 2 + 0] = tri.t2.u;
+        textureCoordArray[i * 3 * 2 + 1 * 2 + 1] = tri.t2.v;
+        textureCoordArray[i * 3 * 2 + 2 * 2 + 0] = tri.t3.u;
+        textureCoordArray[i * 3 * 2 + 2 * 2 + 1] = tri.t3.v;
+        colorArray[i * 3 * 4 + 0 * 4 + 0] = tri.c1.r;
+        colorArray[i * 3 * 4 + 0 * 4 + 1] = tri.c1.g;
+        colorArray[i * 3 * 4 + 0 * 4 + 2] = tri.c1.b;
+        colorArray[i * 3 * 4 + 0 * 4 + 3] = tri.c1.a;
+        colorArray[i * 3 * 4 + 1 * 4 + 0] = tri.c2.r;
+        colorArray[i * 3 * 4 + 1 * 4 + 1] = tri.c2.g;
+        colorArray[i * 3 * 4 + 1 * 4 + 2] = tri.c2.b;
+        colorArray[i * 3 * 4 + 1 * 4 + 3] = tri.c2.a;
+        colorArray[i * 3 * 4 + 2 * 4 + 0] = tri.c3.r;
+        colorArray[i * 3 * 4 + 2 * 4 + 1] = tri.c3.g;
+        colorArray[i * 3 * 4 + 2 * 4 + 2] = tri.c3.b;
+        colorArray[i * 3 * 4 + 2 * 4 + 3] = tri.c3.a;
+    }
+    glVertexPointer(3, GL_FLOAT, 0, (const void *)&vertexArray[0]);
+    glTexCoordPointer(2, GL_FLOAT, 0, (const void *)&textureCoordArray[0]);
+    glColorPointer(4, GL_FLOAT, 0, (const void *)&colorArray[0]);
+    glDrawArrays(GL_TRIANGLES, 0, (GLint)m.triangles.size() * 3);
+}

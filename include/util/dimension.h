@@ -26,14 +26,10 @@
 
 using namespace std;
 
-enum class Dimension : uint_fast8_t
+enum class Dimension : uint8_t
 {
     Overworld,
-};
-
-template <>
-struct enum_traits<Dimension> : public enum_traits_default<Dimension, uint8_t, Dimension::Overworld, Dimension::Overworld>
-{
+    DEFINE_ENUM_LIMITS(Overworld, Overworld)
 };
 
 inline float getZeroBrightnessLevel(Dimension d)

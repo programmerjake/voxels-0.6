@@ -20,7 +20,8 @@
 
 #include "util/dimension.h"
 #include "util/vector.h"
-#include "util/util.h"
+#include "stream/stream.h"
+#include "util/matrix.h"
 #include <unordered_set>
 #include <vector>
 #include <list>
@@ -133,6 +134,17 @@ struct PositionI : public VectorI
     friend VectorI operator -(const PositionI & l, const PositionI & r)
     {
         return (VectorI)l - (VectorI)r;
+    }
+    static PositionI read(Reader &reader)
+    {
+        VectorI v = ::read<VectorI>(reader);
+        Dimension d = ::read<Dimension>(reader);
+        return PositionI(v, d);
+    }
+    void write(Writer &writer) const
+    {
+        VectorI::write(writer);
+        ::write<Dimension>(writer, d);
     }
 };
 
@@ -313,7 +325,23 @@ struct PositionF : public VectorF
     {
         return (VectorF)l - (VectorI)r;
     }
+    static PositionF read(Reader &reader)
+    {
+        VectorF v = ::read<VectorF>(reader);
+        Dimension d = ::read<Dimension>(reader);
+        return PositionF(v, d);
+    }
+    void write(Writer &writer) const
+    {
+        VectorF::write(writer);
+        ::write<Dimension>(writer, d);
+    }
 };
+
+inline PositionF transform(const Matrix &tform, PositionF p)
+{
+    return PositionF(transform(tform, (VectorF)p), p.d);
+}
 
 struct UpdateList // in here because of include issues : should be in util.h
 {

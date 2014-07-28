@@ -19,145 +19,58 @@
 #define MATRIX_H
 
 #include "util/vector.h"
+#include "stream/stream.h"
+#include <cmath>
 
-/** 4x4 matrix for 3D transformation with last row always equal to [0 0 0 1]
- *
- * @author jacob
- */
-class Matrix
+struct Matrix
 {
-public:
-    float x00, x10, x20, x30;
-    float x01, x11, x21, x31;
-    float x02, x12, x22, x32;
+    union
+    {
+        struct
+        {
+            float x00;
+            float x01;
+            float x02;
+            float x03;
+            float x10;
+            float x11;
+            float x12;
+            float x13;
+            float x20;
+            float x21;
+            float x22;
+            float x23;
+            float x30;
+            float x31;
+            float x32;
+            float x33;
+        };
+        float x[4][4];
+    };
 
     float get(const int x, const int y) const
     {
-        switch(x)
-        {
-        case 0:
-            switch(y)
-            {
-            case 0:
-                return this->x00;
-            case 1:
-                return this->x01;
-            case 2:
-                return this->x02;
-            default:
-                return x == y ? 1 : 0;
-            }
-        case 1:
-            switch(y)
-            {
-            case 0:
-                return this->x10;
-            case 1:
-                return this->x11;
-            case 2:
-                return this->x12;
-            default:
-                return x == y ? 1 : 0;
-            }
-        case 2:
-            switch(y)
-            {
-            case 0:
-                return this->x20;
-            case 1:
-                return this->x21;
-            case 2:
-                return this->x22;
-            default:
-                return x == y ? 1 : 0;
-            }
-        case 3:
-            switch(y)
-            {
-            case 0:
-                return this->x30;
-            case 1:
-                return this->x31;
-            case 2:
-                return this->x32;
-            default:
-                return x == y ? 1 : 0;
-            }
-        default:
-            return x == y ? 1 : 0;
-        }
+        assert(x >= 0 && x < 4 && y >= 0 && y < 4);
+        return this->x[x][y];
     }
 
     void set(const int x, const int y, float value)
     {
-        switch(x)
-        {
-        case 0:
-            switch(y)
-            {
-            case 0:
-                this->x00 = value;
-                return;
-            case 1:
-                this->x01 = value;
-                return;
-            case 2:
-                this->x02 = value;
-                return;
-            default:
-                return;
-            }
-        case 1:
-            switch(y)
-            {
-            case 0:
-                this->x10 = value;
-                return;
-            case 1:
-                this->x11 = value;
-                return;
-            case 2:
-                this->x12 = value;
-                return;
-            default:
-                return;
-            }
-        case 2:
-            switch(y)
-            {
-            case 0:
-                this->x20 = value;
-                return;
-            case 1:
-                this->x21 = value;
-                return;
-            case 2:
-                this->x22 = value;
-                return;
-            default:
-                return;
-            }
-        case 3:
-            switch(y)
-            {
-            case 0:
-                this->x30 = value;
-                return;
-            case 1:
-                this->x31 = value;
-                return;
-            case 2:
-                this->x32 = value;
-                return;
-            default:
-                return;
-            }
-        default:
-            return;
-        }
+        assert(x >= 0 && x < 4 && y >= 0 && y < 4);
+        this->x[x][y] = value;
     }
 
-    Matrix(float x00,
+    float(& operator [](size_t index))[4]
+    {
+        return x[index];
+    }
+
+    constexpr const float(& operator [](size_t index) const)[4]
+    {
+        return x[index];
+    }
+
+    constexpr Matrix(float x00,
            float x10,
            float x20,
            float x30,
@@ -168,39 +81,23 @@ public:
            float x02,
            float x12,
            float x22,
-           float x32)
+           float x32,
+           float x03 = 0,
+           float x13 = 0,
+           float x23 = 0,
+           float x33 = 1)
+        : x00(x00), x01(x01), x02(x02), x03(x03), x10(x10), x11(x11), x12(x12), x13(x13), x20(x20),
+          x21(x21), x22(x22), x23(x23), x30(x30), x31(x31), x32(x32), x33(x33)
     {
-        this->x00 = x00;
-        this->x10 = x10;
-        this->x20 = x20;
-        this->x30 = x30;
-        this->x01 = x01;
-        this->x11 = x11;
-        this->x21 = x21;
-        this->x31 = x31;
-        this->x02 = x02;
-        this->x12 = x12;
-        this->x22 = x22;
-        this->x32 = x32;
     }
 
-    Matrix()
+    constexpr Matrix()
+        : x00(1), x01(0), x02(0), x03(0), x10(0), x11(1), x12(0), x13(0), x20(0), x21(0), x22(1), x23(0),
+          x30(0), x31(0), x32(0), x33(1)
     {
-        this->x00 = 1;
-        this->x10 = 0;
-        this->x20 = 0;
-        this->x30 = 0;
-        this->x01 = 0;
-        this->x11 = 1;
-        this->x21 = 0;
-        this->x31 = 0;
-        this->x02 = 0;
-        this->x12 = 0;
-        this->x22 = 1;
-        this->x32 = 0;
     }
 
-    static Matrix identity()
+    constexpr static Matrix identity()
     {
         return Matrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0);
     }
@@ -283,20 +180,20 @@ public:
      * @param position
      *            the position to translate (0, 0, 0) to
      * @return the new translation matrix */
-    static Matrix translate(VectorF position)
+    constexpr static Matrix translate(VectorF position)
     {
         return Matrix(1,
-                          0,
-                          0,
-                          position.x,
-                          0,
-                          1,
-                          0,
-                          position.y,
-                          0,
-                          0,
-                          1,
-                          position.z);
+                      0,
+                      0,
+                      position.x,
+                      0,
+                      1,
+                      0,
+                      position.y,
+                      0,
+                      0,
+                      1,
+                      position.z);
     }
 
     /** creates a translation matrix
@@ -308,7 +205,7 @@ public:
      * @param z
      *            the z coordinate to translate (0, 0, 0) to
      * @return the new translation matrix */
-    static Matrix translate(float x, float y, float z)
+    constexpr static Matrix translate(float x, float y, float z)
     {
         return Matrix(1, 0, 0, x, 0, 1, 0, y, 0, 0, 1, z);
     }
@@ -322,7 +219,7 @@ public:
      * @param z
      *            the amount to scale the z coordinate by
      * @return the new scaling matrix */
-    static Matrix scale(float x, float y, float z)
+    constexpr static Matrix scale(float x, float y, float z)
     {
         return Matrix(x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0);
     }
@@ -334,7 +231,7 @@ public:
      *            <code>s.y</code> is the amount to scale the y coordinate by.<br/>
      *            <code>s.z</code> is the amount to scale the z coordinate by.
      * @return the new scaling matrix */
-    static Matrix scale(VectorF s)
+    constexpr static Matrix scale(VectorF s)
     {
         return Matrix(s.x, 0, 0, 0, 0, s.y, 0, 0, 0, 0, s.z, 0);
     }
@@ -344,91 +241,98 @@ public:
      * @param s
      *            the amount to scale by
      * @return the new scaling matrix */
-    static Matrix scale(float s)
+    constexpr static Matrix scale(float s)
     {
         return Matrix(s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0);
     }
 
     /** @return the determinant of this matrix */
-    float determinant() const
+    constexpr float determinant() const
     {
-        return this->x00 * (this->x11 * this->x22 - this->x12 * this->x21)
-                + this->x10 * (this->x02 * this->x21 - this->x01 * this->x22)
-                + this->x20 * (this->x01 * this->x12 - this->x02 * this->x11);
+        return x03 * x12 * x21 * x30 - x02 * x13 * x21 * x30 - x03 * x11 * x22 * x30 + x01 * x13 * x22 * x30
+               + x02 * x11 * x23 * x30 - x01 * x12 * x23 * x30 - x03 * x12 * x20 * x31 + x02 * x13 * x20 * x31 +
+               x03 * x10 * x22 * x31 - x00 * x13 * x22 * x31 - x02 * x10 * x23 * x31 + x00 * x12 * x23 * x31 + x03
+               * x11 * x20 * x32 - x01 * x13 * x20 * x32 - x03 * x10 * x21 * x32 + x00 * x13 * x21 * x32 + x01 *
+               x10 * x23 * x32 - x00 * x11 * x23 * x32 - x02 * x11 * x20 * x33 + x01 * x12 * x20 * x33 + x02 * x10
+               * x21 * x33 - x00 * x12 * x21 * x33 - x01 * x10 * x22 * x33 + x00 * x11 * x22 * x33;
     }
 
     /** @return the inverse of this matrix. */
-    Matrix invert() const
+    Matrix inverse() const
     {
         float det = determinant();
+
         if(det == 0.0f)
+        {
             throw domain_error("can't invert singular matrix");
+        }
+
         float factor = 1.0f / det;
-        return Matrix((this->x11 * this->x22 - this->x12 * this->x21) * factor,
-                          (this->x12 * this->x20 - this->x10 * this->x22) * factor,
-                          (this->x10 * this->x21 - this->x11 * this->x20) * factor,
-                          (-this->x10 * this->x21 * this->x32 + this->x11
-                                  * this->x20 * this->x32 + this->x10 * this->x22
-                                  * this->x31 - this->x12 * this->x20 * this->x31
-                                  - this->x11 * this->x22 * this->x30 + this->x12
-                                  * this->x21 * this->x30)
-                                  * factor,
-                          (this->x02 * this->x21 - this->x01 * this->x22) * factor,
-                          (this->x00 * this->x22 - this->x02 * this->x20) * factor,
-                          (this->x01 * this->x20 - this->x00 * this->x21) * factor,
-                          (this->x00 * this->x21 * this->x32 - this->x01 * this->x20
-                                  * this->x32 - this->x00 * this->x22 * this->x31
-                                  + this->x02 * this->x20 * this->x31 + this->x01
-                                  * this->x22 * this->x30 - this->x02 * this->x21
-                                  * this->x30)
-                                  * factor,
-                          (this->x01 * this->x12 - this->x02 * this->x11) * factor,
-                          (this->x02 * this->x10 - this->x00 * this->x12) * factor,
-                          (this->x00 * this->x11 - this->x01 * this->x10) * factor,
-                          (-this->x00 * this->x11 * this->x32 + this->x01
-                                  * this->x10 * this->x32 + this->x00 * this->x12
-                                  * this->x31 - this->x02 * this->x10 * this->x31
-                                  - this->x01 * this->x12 * this->x30 + this->x02
-                                  * this->x11 * this->x30)
-                                  * factor);
+        return Matrix((x11 * x22 * x33 - x12 * x21 * x33 - x11 * x23 * x32 + x13 * x21 * x32 + x12 * x23 * x31 - x13 * x22 * x31) * factor,
+                      (-x10 * x22 * x33 + x12 * x20 * x33 + x10 * x23 * x32 - x13 * x20 * x32 - x12 * x23 * x30 + x13 * x22 * x30) * factor,
+                      (x10 * x21 * x33 - x11 * x20 * x33 - x10 * x23 * x31 + x13 * x20 * x31 + x11 * x23 * x30 - x13 * x21 * x30) * factor,
+                      (-x10 * x21 * x32 + x11 * x20 * x32 + x10 * x22 * x31 - x12 * x20 * x31 - x11 * x22 * x30 + x12 * x21 * x30) * factor,
+                      (-x01 * x22 * x33 + x02 * x21 * x33 + x01 * x23 * x32 - x03 * x21 * x32 - x02 * x23 * x31 + x03 * x22 * x31) * factor,
+                      (x00 * x22 * x33 - x02 * x20 * x33 - x00 * x23 * x32 + x03 * x20 * x32 + x02 * x23 * x30 - x03 * x22 * x30) * factor,
+                      (-x00 * x21 * x33 + x01 * x20 * x33 + x00 * x23 * x31 - x03 * x20 * x31 - x01 * x23 * x30 + x03 * x21 * x30) * factor,
+                      (x00 * x21 * x32 - x01 * x20 * x32 - x00 * x22 * x31 + x02 * x20 * x31 + x01 * x22 * x30 - x02 * x21 * x30) * factor,
+                      (x01 * x12 * x33 - x02 * x11 * x33 - x01 * x13 * x32 + x03 * x11 * x32 + x02 * x13 * x31 - x03 * x12 * x31) * factor,
+                      (-x00 * x12 * x33 + x02 * x10 * x33 + x00 * x13 * x32 - x03 * x10 * x32 - x02 * x13 * x30 + x03 * x12 * x30) * factor,
+                      (x00 * x11 * x33 - x01 * x10 * x33 - x00 * x13 * x31 + x03 * x10 * x31 + x01 * x13 * x30 - x03 * x11 * x30) * factor,
+                      (-x00 * x11 * x32 + x01 * x10 * x32 + x00 * x12 * x31 - x02 * x10 * x31 - x01 * x12 * x30 + x02 * x11 * x30) * factor,
+                      (-x01 * x12 * x23 + x02 * x11 * x23 + x01 * x13 * x22 - x03 * x11 * x22 - x02 * x13 * x21 + x03 * x12 * x21) * factor,
+                      (x00 * x12 * x23 - x02 * x10 * x23 - x00 * x13 * x22 + x03 * x10 * x22 + x02 * x13 * x20 - x03 * x12 * x20) * factor,
+                      (-x00 * x11 * x23 + x01 * x10 * x23 + x00 * x13 * x21 - x03 * x10 * x21 - x01 * x13 * x20 + x03 * x11 * x20) * factor,
+                      (x00 * x11 * x22 - x01 * x10 * x22 - x00 * x12 * x21 + x02 * x10 * x21 + x01 * x12 * x20 - x02 * x11 * x20) * factor);
     }
 
     /** @return the inverse of this matrix. */
-    friend Matrix inverse(const Matrix & m)
+    friend Matrix inverse(const Matrix &m)
     {
-        return m.invert();
+        return m.inverse();
     }
 
-    Matrix concat(Matrix rt) const
+    friend Matrix transpose(const Matrix &m)
     {
-        return Matrix(this->x00 * rt.x00 + this->x01 * rt.x10 + this->x02
-                * rt.x20, this->x10 * rt.x00 + this->x11 * rt.x10 + this->x12
-                * rt.x20, this->x20 * rt.x00 + this->x21 * rt.x10 + this->x22
-                * rt.x20, this->x30 * rt.x00 + this->x31 * rt.x10 + this->x32
-                * rt.x20 + rt.x30, this->x00 * rt.x01 + this->x01 * rt.x11
-                + this->x02 * rt.x21, this->x10 * rt.x01 + this->x11 * rt.x11
-                + this->x12 * rt.x21, this->x20 * rt.x01 + this->x21 * rt.x11
-                + this->x22 * rt.x21, this->x30 * rt.x01 + this->x31 * rt.x11
-                + this->x32 * rt.x21 + rt.x31, this->x00 * rt.x02 + this->x01
-                * rt.x12 + this->x02 * rt.x22, this->x10 * rt.x02 + this->x11
-                * rt.x12 + this->x12 * rt.x22, this->x20 * rt.x02 + this->x21
-                * rt.x12 + this->x22 * rt.x22, this->x30 * rt.x02 + this->x31
-                * rt.x12 + this->x32 * rt.x22 + rt.x32);
-	}
+        return Matrix(m.x00, m.x01, m.x02, m.x03,
+                       m.x10, m.x11, m.x12, m.x13,
+                       m.x20, m.x21, m.x22, m.x23,
+                       m.x30, m.x31, m.x32, m.x33);
+    }
 
-    VectorF apply(VectorF v) const
+    constexpr Matrix concat(Matrix rt) const
+    {
+        return Matrix(/* x00*/ x00 * rt.x00 + x01 * rt.x10 + x02 * rt.x20 + x03 * rt.x30,
+                               /* x10*/ x10 * rt.x00 + x11 * rt.x10 + x12 * rt.x20 + x13 * rt.x30,
+                               /* x20*/ x20 * rt.x00 + x21 * rt.x10 + x22 * rt.x20 + x23 * rt.x30,
+                               /* x30*/ x30 * rt.x00 + x31 * rt.x10 + x32 * rt.x20 + x33 * rt.x30,
+                               /* x01*/ x00 * rt.x01 + x01 * rt.x11 + x02 * rt.x21 + x03 * rt.x31,
+                               /* x11*/ x10 * rt.x01 + x11 * rt.x11 + x12 * rt.x21 + x13 * rt.x31,
+                               /* x21*/ x20 * rt.x01 + x21 * rt.x11 + x22 * rt.x21 + x23 * rt.x31,
+                               /* x31*/ x30 * rt.x01 + x31 * rt.x11 + x32 * rt.x21 + x33 * rt.x31,
+                               /* x02*/ x00 * rt.x02 + x01 * rt.x12 + x02 * rt.x22 + x03 * rt.x32,
+                               /* x12*/ x10 * rt.x02 + x11 * rt.x12 + x12 * rt.x22 + x13 * rt.x32,
+                               /* x22*/ x20 * rt.x02 + x21 * rt.x12 + x22 * rt.x22 + x23 * rt.x32,
+                               /* x32*/ x30 * rt.x02 + x31 * rt.x12 + x32 * rt.x22 + x33 * rt.x32,
+                               /* x03*/ x00 * rt.x03 + x01 * rt.x13 + x02 * rt.x23 + x03 * rt.x33,
+                               /* x13*/ x10 * rt.x03 + x11 * rt.x13 + x12 * rt.x23 + x13 * rt.x33,
+                               /* x23*/ x20 * rt.x03 + x21 * rt.x13 + x22 * rt.x23 + x23 * rt.x33,
+                               /* x33*/ x30 * rt.x03 + x31 * rt.x13 + x32 * rt.x23 + x33 * rt.x33);
+    }
+
+    constexpr VectorF apply(VectorF v) const
     {
         return VectorF(v.x * this->x00 + v.y * this->x10 + v.z * this->x20
-                + this->x30, v.x * this->x01 + v.y * this->x11 + v.z * this->x21
-                + this->x31, v.x * this->x02 + v.y * this->x12 + v.z * this->x22
-                + this->x32);
+                      + this->x30, v.x * this->x01 + v.y * this->x11 + v.z * this->x21
+                      + this->x31, v.x * this->x02 + v.y * this->x12 + v.z * this->x22
+                      + this->x32);
     }
 
-    VectorF applyToNormal(VectorF v) const
+    constexpr VectorF applyNoTranslate(VectorF v) const
     {
-        return normalize(VectorF(v.x * this->x00 + v.y * this->x10 + v.z * this->x20, v.x
-                * this->x01 + v.y * this->x11 + v.z * this->x21, v.x * this->x02
-                + v.y * this->x12 + v.z * this->x22));
+        return VectorF(v.x * this->x00 + v.y * this->x10 + v.z * this->x20, v.x
+                                * this->x01 + v.y * this->x11 + v.z * this->x21, v.x * this->x02
+                                + v.y * this->x12 + v.z * this->x22);
     }
 
     static Matrix thetaPhi(double theta, double phi)
@@ -436,36 +340,96 @@ public:
         Matrix t = rotateX(-phi);
         return rotateY(theta).concat(t);
     }
+
+    static Matrix read(Reader &reader)
+    {
+        float x00 = ::read_finite<float32_t>(reader);
+        float x01 = ::read_finite<float32_t>(reader);
+        float x02 = ::read_finite<float32_t>(reader);
+        float x03 = ::read_finite<float32_t>(reader);
+        float x10 = ::read_finite<float32_t>(reader);
+        float x11 = ::read_finite<float32_t>(reader);
+        float x12 = ::read_finite<float32_t>(reader);
+        float x13 = ::read_finite<float32_t>(reader);
+        float x20 = ::read_finite<float32_t>(reader);
+        float x21 = ::read_finite<float32_t>(reader);
+        float x22 = ::read_finite<float32_t>(reader);
+        float x23 = ::read_finite<float32_t>(reader);
+        float x30 = ::read_finite<float32_t>(reader);
+        float x31 = ::read_finite<float32_t>(reader);
+        float x32 = ::read_finite<float32_t>(reader);
+        float x33 = ::read_finite<float32_t>(reader);
+        return Matrix(x00, x10, x20, x30,
+                       x01, x11, x21, x31,
+                       x02, x12, x22, x32,
+                       x03, x13, x23, x33);
+    }
+
+    void write(Writer &writer) const
+    {
+        ::write<float32_t>(writer, x00);
+        ::write<float32_t>(writer, x01);
+        ::write<float32_t>(writer, x02);
+        ::write<float32_t>(writer, x03);
+        ::write<float32_t>(writer, x10);
+        ::write<float32_t>(writer, x11);
+        ::write<float32_t>(writer, x12);
+        ::write<float32_t>(writer, x13);
+        ::write<float32_t>(writer, x20);
+        ::write<float32_t>(writer, x21);
+        ::write<float32_t>(writer, x22);
+        ::write<float32_t>(writer, x23);
+        ::write<float32_t>(writer, x30);
+        ::write<float32_t>(writer, x31);
+        ::write<float32_t>(writer, x32);
+        ::write<float32_t>(writer, x33);
+    }
 };
 
-inline VectorF transform(const Matrix & m, VectorF v)
+constexpr VectorF transform(const Matrix &m, VectorF v)
 {
     return m.apply(v);
 }
 
-inline bool operator ==(const Matrix & a, const Matrix & b)
+inline VectorF transformNormal(const Matrix &m, VectorF v)
+{
+    return normalizeNoThrow(transpose(inverse(m)).applyNoTranslate(v));
+}
+
+constexpr Matrix transform(const Matrix & a, const Matrix & b)
+{
+    return b.concat(a);
+}
+
+inline bool operator ==(const Matrix &a, const Matrix &b)
 {
     for(int y = 0; y < 4; y++)
     {
         for(int x = 0; x < 4; x++)
         {
             if(a.get(x, y) != b.get(x, y))
+            {
                 return false;
+            }
         }
     }
+
     return true;
 }
 
-inline bool operator !=(const Matrix & a, const Matrix & b)
+inline bool operator !=(const Matrix &a, const Matrix &b)
 {
     for(int y = 0; y < 4; y++)
     {
         for(int x = 0; x < 4; x++)
         {
             if(a.get(x, y) != b.get(x, y))
+            {
                 return true;
+            }
         }
     }
+
     return false;
 }
 

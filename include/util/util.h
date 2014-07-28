@@ -15,7 +15,6 @@
  * MA 02110-1301, USA.
  *
  */
-#include "util/position.h"
 #ifndef UTIL_H
 #define UTIL_H
 
@@ -23,25 +22,16 @@
 #include <cstdint>
 #include <cwchar>
 #include <string>
+#include <cassert>
 
 using namespace std;
 
 const float eps = 1e-4;
 
 template <typename T>
-inline const T limit(const T v, const T minV, const T maxV)
+constexpr T limit(const T v, const T minV, const T maxV)
 {
-    if(v > maxV)
-    {
-        return maxV;
-    }
-
-    if(minV > v)
-    {
-        return minV;
-    }
-
-    return v;
+    return maxV < v ? maxV : (v < minV ? minV : v);
 }
 
 inline int ifloor(float v)
@@ -55,23 +45,13 @@ inline int iceil(float v)
 }
 
 template <typename T>
-inline int sgn(T v)
+constexpr int sgn(T v)
 {
-    if(v < 0)
-    {
-        return -1;
-    }
-
-    if(v > 0)
-    {
-        return 1;
-    }
-
-    return 0;
+    return v < 0 ? -1 : (0 < v ? 1 : 0);
 }
 
 template <typename T>
-inline const T interpolate(const float t, const T a, const T b)
+constexpr T interpolate(float t, T a, T b)
 {
     return a + t * (b - a);
 }

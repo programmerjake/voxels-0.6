@@ -17,8 +17,10 @@
  */
 #if 1
 #warning finish main.cpp
+#include "util/linked_map.h"
 int main()
 {
+    linked_map<int, int> my_map;
     return 0;
 }
 #else

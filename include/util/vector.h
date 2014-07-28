@@ -19,10 +19,12 @@
 #ifndef VECTOR_H
 #define VECTOR_H
 
+#include "stream/stream.h"
 #include <cmath>
 #include <stdexcept>
 #include <random>
 #include <ostream>
+#include <cstdint>
 
 using namespace std;
 
@@ -30,7 +32,7 @@ struct VectorF;
 
 struct VectorI
 {
-    int x, y, z;
+    int32_t x, y, z;
     constexpr VectorI(int x, int y, int z)
         : x(x), y(y), z(z)
     {
@@ -142,6 +144,21 @@ public:
     friend ostream & operator <<(ostream & os, const VectorI & v)
     {
         return os << "<" << v.x << ", " << v.y << ", " << v.z << ">";
+    }
+
+    static VectorI read(Reader &reader)
+    {
+        int32_t x = ::read<int32_t>(reader);
+        int32_t y = ::read<int32_t>(reader);
+        int32_t z = ::read<int32_t>(reader);
+        return VectorI(x, y, z);
+    }
+
+    void write(Writer &writer) const
+    {
+        ::write<int32_t>(writer, x);
+        ::write<int32_t>(writer, y);
+        ::write<int32_t>(writer, z);
     }
 };
 
@@ -317,19 +334,21 @@ struct VectorF
         return dot(v, v);
     }
 
-    friend float abs(const VectorF & v)
+    friend constexpr float abs(const VectorF & v)
     {
         return sqrt(absSquared(v));
     }
 
-    friend const VectorF normalizeNoThrow(const VectorF & v)
+private:
+    static constexpr float normalizeNoThrowHelper(float v)
     {
-        float r = abs(v);
-        if(r == 0)
-        {
-            r = 1;
-        }
-        return v / r;
+        return v == 0 ? 1 : v;
+    }
+public:
+
+    friend constexpr VectorF normalizeNoThrow(VectorF v)
+    {
+        return v / normalizeNoThrowHelper(abs(v));
     }
 
     friend const VectorF normalize(const VectorF v)
@@ -398,6 +417,21 @@ struct VectorF
     {
         return os << "<" << v.x << ", " << v.y << ", " << v.z << ">";
     }
+
+    static VectorF read(Reader &reader)
+    {
+        float x = ::read_finite<float32_t>(reader);
+        float y = ::read_finite<float32_t>(reader);
+        float z = ::read_finite<float32_t>(reader);
+        return VectorF(x, y, z);
+    }
+
+    void write(Writer &writer) const
+    {
+        ::write<float32_t>(writer, x);
+        ::write<float32_t>(writer, y);
+        ::write<float32_t>(writer, z);
+    }
 };
 
 constexpr inline bool operator ==(const VectorF & a, const VectorI & b)
@@ -424,7 +458,8 @@ inline VectorF normalize(const VectorI & v)
 {
     return normalize((VectorF)v);
 }
-inline VectorF normalizeNoThrow(const VectorI & v)
+
+constexpr VectorF normalizeNoThrow(const VectorI & v)
 {
     return normalizeNoThrow((VectorF)v);
 }

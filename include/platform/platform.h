@@ -24,6 +24,7 @@
 #include "util/matrix.h"
 #include "util/vector.h"
 #include "stream/stream.h"
+#include "render/mesh.h"
 
 #ifndef EVENT_H_INCLUDED
 class EventHandler;
@@ -238,6 +239,7 @@ namespace Display
     bool grabMouse();
     void grabMouse(bool g);
     VectorF transformMouseTo3D(float x, float y, float depth = 1.0f);
+    void render(const Mesh & m);
 }
 
 void startGraphics();

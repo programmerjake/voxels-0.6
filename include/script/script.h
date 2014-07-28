@@ -696,7 +696,7 @@ inline shared_ptr<Scripting::Data> Scripting::Data::read(Reader &reader)
     assert(false);
 }
 
-inline void runEntityPartScript(Mesh dest, Mesh partMesh, shared_ptr<Script> script, VectorF position, VectorF velocity, float age, shared_ptr<Scripting::DataObject> ioObject = make_shared<Scripting::DataObject>())
+inline void runEntityPartScript(shared_ptr<Mesh> dest, shared_ptr<Mesh> partMesh, shared_ptr<Script> script, VectorF position, VectorF velocity, float age, shared_ptr<Scripting::DataObject> ioObject = make_shared<Scripting::DataObject>())
 {
     try
     {
@@ -748,7 +748,7 @@ inline void runEntityPartScript(Mesh dest, Mesh partMesh, shared_ptr<Script> scr
         if(colorA < 0 || colorA > 1)
             throw Scripting::ScriptException(L"io.colorA is not a valid value");
         if(doDraw)
-            dest->add(scaleColors(Color(colorR, colorG, colorB, colorA), transform(tform, partMesh)));
+            dest->append(colorize(RGBAF(colorR, colorG, colorB, colorA), transform(tform, partMesh)));
     }
     catch(Scripting::ScriptException & e)
     {

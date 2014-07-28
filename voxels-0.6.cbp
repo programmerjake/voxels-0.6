@@ -60,7 +60,9 @@
 		<Unit filename="include/render/generate.h" />
 		<Unit filename="include/render/mesh.h" />
 		<Unit filename="include/render/render_layer.h" />
+		<Unit filename="include/render/render_object.h" />
 		<Unit filename="include/render/text.h" />
+		<Unit filename="include/render/triangle.h" />
 		<Unit filename="include/script/script.h" />
 		<Unit filename="include/script/script_nodes.h" />
 		<Unit filename="include/stream/compressed_stream.h" />
@@ -77,6 +79,7 @@
 		<Unit filename="include/util/enum_traits.h" />
 		<Unit filename="include/util/flag.h" />
 		<Unit filename="include/util/game_version.h" />
+		<Unit filename="include/util/linked_map.h" />
 		<Unit filename="include/util/matrix.h" />
 		<Unit filename="include/util/position.h" />
 		<Unit filename="include/util/solve.h" />

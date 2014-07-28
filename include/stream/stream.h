@@ -28,6 +28,8 @@
 #include <list>
 #include <cmath>
 #include <functional>
+#include <type_traits>
+#include <cassert>
 #include "util/string_cast.h"
 #include "util/enum_traits.h"
 #ifdef DEBUG_STREAM
@@ -440,13 +442,19 @@ public:
     }
 };
 
-template <typename T>
-T read(Reader & reader);
+template <typename T, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
+inline T read(Reader &reader)
+{
+    return T::read(reader);
+}
 
-template <typename T>
-T read_limited(Reader & reader, T minV, T maxV);
+template <typename T, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
+inline void write(Writer &writer, const T &value)
+{
+    value.write(writer);
+}
 
-template <typename T>
+template <typename T, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
 inline T read_finite(Reader & reader)
 {
     return read<T>(reader);
@@ -463,56 +471,53 @@ inline T read_checked(Reader & reader, function<bool(T)> checkFn)
     return retval;
 }
 
-template <typename T>
-void write(Writer &writer, T value);
-
 #define DEFINE_RW_FUNCTIONS_FOR_BASIC_INTEGER_TYPE(typeName, functionSuffix) \
-template <> \
-inline typeName read<typeName>(Reader & reader) \
+template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
+inline typeName read(Reader & reader) \
 { \
     return reader.read ## functionSuffix(); \
 } \
-template <> \
-inline typeName read_limited<typeName>(Reader & reader, typeName minV, typeName maxV) \
+template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
+inline typeName read_limited(Reader & reader, typeName minV, typeName maxV) \
 { \
-    return reader.readLimited ## functionSuffix(); \
+    return reader.readLimited ## functionSuffix(minV, maxV); \
 } \
-template <> \
-inline void write<typeName>(Writer & writer, typeName value) \
+template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
+inline void write(Writer & writer, typeName value) \
 { \
     writer.write ## functionSuffix(value); \
 }
 
 #define DEFINE_RW_FUNCTIONS_FOR_BASIC_FLOAT_TYPE(typeName, functionSuffix) \
-template <> \
-inline typeName read<typeName>(Reader & reader) \
+template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
+inline typeName read(Reader & reader) \
 { \
     return reader.read ## functionSuffix(); \
 } \
-template <> \
-inline typeName read_finite<typeName>(Reader & reader) \
+template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
+inline typeName read_finite(Reader & reader) \
 { \
     return reader.readFinite ## functionSuffix(); \
 } \
-template <> \
-inline typeName read_limited<typeName>(Reader & reader, typeName minV, typeName maxV) \
+template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
+inline typeName read_limited(Reader & reader, typeName minV, typeName maxV) \
 { \
-    return reader.readLimited ## functionSuffix(); \
+    return reader.readLimited ## functionSuffix(minV, maxV); \
 } \
-template <> \
-inline void write<typeName>(Writer & writer, typeName value) \
+template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
+inline void write(Writer & writer, typeName value) \
 { \
     writer.write ## functionSuffix(value); \
 }
 
 #define DEFINE_RW_FUNCTIONS_FOR_BASIC_TYPE(typeName, functionSuffix) \
-template <> \
-inline typeName read<typeName>(Reader & reader) \
+template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
+inline typeName read(Reader & reader) \
 { \
     return reader.read ## functionSuffix(); \
 } \
-template <> \
-inline void write<typeName>(Writer & writer, typeName value) \
+template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
+inline void write(Writer & writer, typeName value) \
 { \
     writer.write ## functionSuffix(value); \
 }
@@ -534,16 +539,16 @@ DEFINE_RW_FUNCTIONS_FOR_BASIC_TYPE(bool, Bool)
 #undef DEFINE_RW_FUNCTIONS_FOR_BASIC_FLOAT_TYPE
 #undef DEFINE_RW_FUNCTIONS_FOR_BASIC_TYPE
 
-template <typename T>
-inline T read(Reader & reader)
+template <typename T, typename std::enable_if<std::is_enum<T>::value, int>::type = 0>
+inline T read(Reader &reader)
 {
-    return (T)read_limited<typename enum_traits<T>::rwtype>(reader, (enum_traits<T>::rwtype)enum_traits<T>::minimum, (enum_traits<T>::rwtype)enum_traits<T>::maximum);
+    return (T)read_limited<typename enum_traits<T>::rwtype>(reader, (typename enum_traits<T>::rwtype)enum_traits<T>::minimum, (typename enum_traits<T>::rwtype)enum_traits<T>::maximum);
 }
 
-template <typename T>
-inline write(Writer & writer, T value)
+template <typename T, typename std::enable_if<std::is_enum<T>::value, int>::type = 0>
+inline void write(Writer &writer, T value)
 {
-    write<typename enum_traits<T>::rwtype>(writer, (enum_traits<T>::rwtype)value);
+    write<typename enum_traits<T>::rwtype>(writer, (typename enum_traits<T>::rwtype)value);
 }
 
 class FileReader final : public Reader
