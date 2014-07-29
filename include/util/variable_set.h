@@ -175,4 +175,20 @@ public:
     }
 };
 
+template <typename T>
+struct rw_cached_helper<T, typename std::enable_if<rw_class_traits_helper_has_read_with_VariableSet<T>::value>::type>
+{
+    typedef typename rw_class_traits_helper_has_read_with_VariableSet<T>::value_type value_type;
+    template <typename VariableSetT, typename = std::enable_if<std::is_same<VariableSetT, VariableSet>::value>>
+    static value_type read(Reader &reader, VariableSetT &variableSet)
+    {
+        return variableSet.read_helper<T>(reader);
+    }
+    template <typename VariableSetT, typename = std::enable_if<std::is_same<VariableSetT, VariableSet>::value>>
+    static void write(Writer &writer, VariableSetT &variableSet, value_type value)
+    {
+        return variableSet.write_helper<T>(writer, value, is_value_modified<T>()(value));
+    }
+};
+
 #endif // VARIABLE_SET_H_INCLUDED
