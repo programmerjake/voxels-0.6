@@ -19,37 +19,58 @@
 #define GENERATE_H_INCLUDED
 
 #include "render/mesh.h"
+#include "texture/texture_descriptor.h"
 #include <utility>
 
-inline Mesh invert(Mesh mesh)
+using namespace std;
+
+inline Mesh reverse(const Mesh &mesh)
 {
-    vector<Triangle> triangles;
-    triangles.reserve(mesh->size());
-    for(Triangle tri : *mesh)
+    vector<Triangle> triangles = mesh.triangles;
+    for(Triangle &tri : triangles)
     {
-        swap(tri.p[0], tri.p[1]);
-        swap(tri.c[0], tri.c[1]);
-        swap(tri.t[0], tri.t[1]);
-        triangles.push_back(tri);
+        swap(tri.p1, tri.p2);
+        swap(tri.c1, tri.c2);
+        swap(tri.t1, tri.t2);
+        swap(tri.n1, tri.n2);
     }
-    return Mesh(new Mesh_t(mesh->texture(), triangles));
+    return Mesh(std::move(triangles), mesh.image);
 }
 
-inline TransformedMesh invert(TransformedMesh mesh)
+inline shared_ptr<Mesh> reverse(shared_ptr<Mesh> mesh)
 {
-    mesh.mesh = invert(mesh.mesh);
+    if(!mesh)
+        return nullptr;
+    return make_shared<Mesh>(reverse(*mesh));
+}
+
+inline TransformedMesh reverse(TransformedMesh mesh)
+{
+    mesh.mesh = reverse(mesh.mesh);
+    return mesh;
+}
+
+inline ColorizedTransformedMesh reverse(ColorizedTransformedMesh mesh)
+{
+    mesh.mesh = reverse(mesh.mesh);
+    return mesh;
+}
+
+inline ColorizedMesh reverse(ColorizedMesh mesh)
+{
+    mesh.mesh = reverse(mesh.mesh);
     return mesh;
 }
 
 namespace Generate
 {
-	inline Mesh quadrilateral(TextureDescriptor texture, VectorF p1, Color c1, VectorF p2, Color c2, VectorF p3, Color c3, VectorF p4, Color c4)
+	inline Mesh quadrilateral(TextureDescriptor texture, VectorF p1, ColorF c1, VectorF p2, ColorF c2, VectorF p3, ColorF c3, VectorF p4, ColorF c4)
 	{
 		const TextureCoord t1 = TextureCoord(texture.minU, texture.minV);
 		const TextureCoord t2 = TextureCoord(texture.maxU, texture.minV);
 		const TextureCoord t3 = TextureCoord(texture.maxU, texture.maxV);
 		const TextureCoord t4 = TextureCoord(texture.minU, texture.maxV);
-		return Mesh(new Mesh_t(texture.image, vector<Triangle>{Triangle(p1, c1, t1, p2, c2, t2, p3, c3, t3), Triangle(p3, c3, t3, p4, c4, t4, p1, c1, t1)}));
+		return Mesh(vector<Triangle>{Triangle(p1, c1, t1, p2, c2, t2, p3, c3, t3), Triangle(p3, c3, t3, p4, c4, t4, p1, c1, t1)}, texture.image);
 	}
 
 	/// make a box from <0, 0, 0> to <1, 1, 1>
@@ -63,11 +84,12 @@ namespace Generate
 		const VectorF p5 = VectorF(1, 0, 1);
 		const VectorF p6 = VectorF(0, 1, 1);
 		const VectorF p7 = VectorF(1, 1, 1);
-		Mesh retval = Mesh(new Mesh_t());
-		const Color c = Color(1);
+		Mesh retval;
+		retval.triangles.reserve(12);
+		constexpr ColorF c = colorizeIdentity();
 		if(nx)
 		{
-			retval->add(quadrilateral(nx,
+			retval.append(quadrilateral(nx,
 									 p0, c,
 									 p4, c,
 									 p6, c,
@@ -76,7 +98,7 @@ namespace Generate
 		}
 		if(px)
 		{
-			retval->add(quadrilateral(px,
+			retval.append(quadrilateral(px,
 									 p5, c,
 									 p1, c,
 									 p3, c,
@@ -85,7 +107,7 @@ namespace Generate
 		}
 		if(ny)
 		{
-			retval->add(quadrilateral(ny,
+			retval.append(quadrilateral(ny,
 									 p0, c,
 									 p1, c,
 									 p5, c,
@@ -94,7 +116,7 @@ namespace Generate
 		}
 		if(py)
 		{
-			retval->add(quadrilateral(py,
+			retval.append(quadrilateral(py,
 									 p6, c,
 									 p7, c,
 									 p3, c,
@@ -103,7 +125,7 @@ namespace Generate
 		}
 		if(nz)
 		{
-			retval->add(quadrilateral(nz,
+			retval.append(quadrilateral(nz,
 									 p1, c,
 									 p0, c,
 									 p2, c,
@@ -112,7 +134,7 @@ namespace Generate
 		}
 		if(pz)
 		{
-			retval->add(quadrilateral(pz,
+			retval.append(quadrilateral(pz,
 									 p4, c,
 									 p5, c,
 									 p7, c,

@@ -35,7 +35,7 @@ namespace Text
     float height(wstring str, const TextProperties & properties = defaultTextProperties);
     float xPos(wstring str, const TextProperties & properties = defaultTextProperties);
     float yPos(wstring str, const TextProperties & properties = defaultTextProperties);
-    Mesh mesh(wstring str, Color color = Color(1), const TextProperties & properties = defaultTextProperties);
+    Mesh mesh(wstring str, ColorF color = colorizeIdentity(), const TextProperties & properties = defaultTextProperties);
 }
 
 #endif // TEXT_H_INCLUDED

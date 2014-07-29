@@ -154,6 +154,11 @@ constexpr ColorI colorize(ColorF color, ColorI v)
     return RGBAI((int)((int)v.r * color.r), (int)((int)v.g * color.g), (int)((int)v.b * color.b), (int)((int)v.a * color.a));
 }
 
+constexpr ColorF colorizeIdentity()
+{
+    return RGBAF(1, 1, 1, 1);
+}
+
 template <>
 constexpr ColorF interpolate<ColorF>(const float t, const ColorF a, const ColorF b)
 {

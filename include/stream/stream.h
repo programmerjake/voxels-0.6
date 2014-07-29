@@ -442,10 +442,69 @@ public:
     }
 };
 
-template <typename T, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
-inline T read(Reader &reader)
+template <typename ReturnType>
+struct read_base
 {
-    return T::read(reader);
+    read_base(const read_base &) = delete;
+    const read_base & operator =(const read_base &) = delete;
+protected:
+    ReturnType value;
+    read_base(ReturnType && value)
+        : value(value)
+    {
+    }
+public:
+    operator ReturnType &&() &&
+    {
+        return std::move(value);
+    }
+};
+
+struct VariableSet;
+
+template <typename T>
+struct read
+{
+    read(Reader &reader) = delete;
+    read(Reader &reader, VariableSet &variableSet) = delete;
+};
+
+template <typename T>
+struct is_value_modified
+{
+    constexpr bool operator ()(const T &) const
+    {
+        return false;
+    }
+};
+
+template <typename T>
+struct write
+{
+    template <typename VariableType>
+    write(Writer &writer, VariableType value) = delete;
+    template <typename VariableType>
+    write(Writer &writer, VariableSet &variableSet, VariableType value) = delete;
+};
+
+template <typename T>
+struct rw_class_traits_helper_has_read_with_VariableSet
+{
+    static constexpr bool value = false;
+};
+
+template <typename T>
+
+template <typename T>
+struct rw_class_traits
+
+template <typename T, typename = std::enable_if<std::is_class<T>::value>::type>
+struct read<T> : public read_base<T>
+{
+    read(Reader &reader)
+        : read_base<T>(T::read(reader))
+    {
+    }
 }
 
 template <typename T, typename std::enable_if<std::is_class<T>::value, int>::type = 0>

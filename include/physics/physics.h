@@ -345,7 +345,7 @@ public:
         };
         return shared_ptr<PhysicsObjectConstructor>(new PhysicsObjectConstructor(make, write));
     }
-    static shared_ptr<PhysicsObjectConstructor> read(Reader & reader)
+    static shared_ptr<PhysicsObjectConstructor> read(Reader & reader, VariableSet &variableSet)
     {
         uint8_t shape = ::read_limited<uint8_t>(reader, 0, LastShape - 1);
         switch(shape)
@@ -364,7 +364,7 @@ public:
             constraints.reserve(size);
             for(size_t i = 0; i < size; i++)
             {
-                constraints[i] = ::read<PhysicsConstraint>(reader);
+                constraints[i] = ::read<PhysicsConstraint>(reader, variableSet);
             }
             return boxMaker(extents, affectedByGravity, isStatic, properties, constraints);
         }
@@ -380,7 +380,7 @@ public:
             constraints.reserve(size);
             for(size_t i = 0; i < size; i++)
             {
-                constraints[i] = ::read<PhysicsConstraint>(reader);
+                constraints[i] = ::read<PhysicsConstraint>(reader, variableSet);
             }
             return cylinderMaker(radius, yExtent, affectedByGravity, isStatic, properties, constraints);
         }
