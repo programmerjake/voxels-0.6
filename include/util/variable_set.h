@@ -142,40 +142,37 @@ public:
         std::get<1>(std::get<1>(*iter)) = value;
         return make_pair(Descriptor<T>(std::get<0>(std::get<1>(*iter))), true);
     }
-};
-
-template <typename T>
-inline shared_ptr<T> read(Reader &reader, VariableSet &variableSet)
-{
-    VariableSet::Descriptor<T> descriptor = read<VariableSet::Descriptor<T>>(reader);
-    if(!descriptor)
-        return nullptr;
-    shared_ptr<T> retval = variableSet.get(descriptor);
-    bool modified = read<bool>(reader);
-    if(retval != nullptr && !modified)
+    template <typename T>
+    shared_ptr<T> read_helper(Reader &reader)
+    {
+        Descriptor<T> descriptor = ::read<Descriptor<T>>(reader);
+        if(!descriptor)
+            return nullptr;
+        shared_ptr<T> retval = get(descriptor);
+        bool modified = ::read<bool>(reader);
+        if(retval != nullptr && !modified)
+            return retval;
+        retval = T::read(reader, *this);
+        set(descriptor, retval);
         return retval;
-    retval = T::read(reader, variableSet);
-    variableSet.set(descriptor, retval);
-    return retval;
-}
-
-template <typename T>
-inline void write(Writer &writer, VariableSet &variableSet, shared_ptr<T> value, bool modified = false)
-{
-    if(value == nullptr)
-    {
-        write<VariableSet::Descriptor<T>>(writer, VariableSet::Descriptor<T>::null());
-        return;
     }
-    pair<VariableSet::Descriptor<T>, bool> findOrMakeReturnValue = variableSet.findOrMake<T>(value);
-    write<VariableSet::Descriptor<T>>(writer, std::get<0>(findOrMakeReturnValue));
-    write<bool>(writer, modified || !std::get<1>(findOrMakeReturnValue));
-    if(std::get<1>(findOrMakeReturnValue) && !modified)
+    template <typename T>
+    void write_helper(Writer &writer, shared_ptr<T> value, bool modified)
     {
-        return;
+        if(value == nullptr)
+        {
+            ::write<Descriptor<T>>(writer, Descriptor<T>::null());
+            return;
+        }
+        pair<Descriptor<T>, bool> findOrMakeReturnValue = findOrMake<T>(value);
+        ::write<Descriptor<T>>(writer, std::get<0>(findOrMakeReturnValue));
+        ::write<bool>(writer, modified || !std::get<1>(findOrMakeReturnValue));
+        if(std::get<1>(findOrMakeReturnValue) && !modified)
+        {
+            return;
+        }
+        value->write(writer, *this);
     }
-    value->write(writer, variableSet);
-}
-
+};
 
 #endif // VARIABLE_SET_H_INCLUDED

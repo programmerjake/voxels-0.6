@@ -487,42 +487,118 @@ struct write
     write(Writer &writer, VariableSet &variableSet, VariableType value) = delete;
 };
 
+struct rw_class_traits_helper
+{
+    static Reader & readerRef();
+    static Writer & writerRef();
+    static VariableSet & variableSetRef();
+};
+
 template <typename T>
 struct rw_class_traits_helper_has_read_with_VariableSet
 {
     static constexpr bool value = false;
+    typedef void value_type;
+};
+
+template <typename T, typename ReturnType = decltype(T::read(rw_class_traits_helper::readerRef(), rw_class_traits_helper::variableSetRef()))>
+struct rw_class_traits_helper_has_read_with_VariableSet<T>
+{
+    static constexpr bool value = true;
+    typedef ReturnType value_type;
 };
 
 template <typename T>
+struct rw_class_traits_helper_has_read_without_VariableSet
+{
+    static constexpr bool value = false;
+    typedef void value_type;
+};
+
+template <typename T, typename ReturnType = decltype(T::read(rw_class_traits_helper::readerRef()))>
+struct rw_class_traits_helper_has_read_without_VariableSet<T>
+{
+    static constexpr bool value = true;
+    typedef ReturnType value_type;
+};
+
+template <typename T>
+struct rw_cached_helper
+{
+    typedef void value_type;
+};
+
+template <typename T, typename = std::enable_if<rw_class_traits_helper_has_read_with_VariableSet<T>::value>>
+struct rw_cached_helper<T>
+{
+    typedef typename rw_class_traits_helper_has_read_with_VariableSet<T>::value_type value_type;
+    template <typename VariableSetT = VariableSet, typename = std::enable_if<std::is_same<VariableSetT, VariableSet>>>
+    static value_type read(Reader &reader, VariableSetT &variableSet)
+    {
+        return variableSet.read_helper<T>(reader);
+    }
+    template <typename VariableSetT = VariableSet, typename = std::enable_if<std::is_same<VariableSetT, VariableSet>>>
+    static void write(Writer &writer, VariableSetT &variableSet, value_type value)
+    {
+        return variableSet.write_helper<T>(writer, value, is_value_modified<T>()(value));
+    }
+};
 
 template <typename T>
 struct rw_class_traits
-
-template <typename T, typename = std::enable_if<std::is_class<T>::value>::type>
-struct read<T> : public read_base<T>
 {
+    static constexpr bool has_pod = rw_class_traits_helper_has_read_without_VariableSet<T>::value;
+    static constexpr bool has_cached = !std::is_same<typename rw_cached_helper<T>::value_type, void>;
+    typedef typename std::conditional<rw_class_traits_helper_has_read_without_VariableSet<T>::value, typename rw_class_traits_helper_has_read_without_VariableSet<T>::value_type, typename rw_cached_helper<T>::value_type>::type value_type;
+    static_assert(!has_pod || !has_cached, "can't define both T::read(Reader &) and T::read(Reader &, VariableSet &)");
+};
+
+template <typename T, typename VariableSetT = VariableSet, typename = std::enable_if<std::is_class<T>::value && (rw_class_traits<T>::has_pod || rw_class_traits<T>::has_cached)>::type>
+struct read<T> : public read_base<typename rw_class_traits<T>::value_type>
+{
+    template <typename = std::enable_if<rw_class_traits<T>::has_pod>::type>
     read(Reader &reader)
-        : read_base<T>(T::read(reader))
+        : read_base<typename rw_class_traits<T>::value_type>(T::read(reader))
+    {
+    }
+    template <typename = std::enable_if<rw_class_traits<T>::has_cached>::type>
+    read(Reader &reader, VariableSetT &variableSet)
+        : read_base<typename rw_class_traits<T>::value_type>(rw_cached_helper<T>::read(reader, variableSet))
     {
     }
 }
 
-template <typename T, typename std::enable_if<std::is_class<T>::value, int>::type = 0>
-inline void write(Writer &writer, const T &value)
+template <typename T, typename = std::enable_if<std::is_class<T>::value && (rw_class_traits<T>::has_pod || rw_class_traits<T>::has_cached)>::type>
+struct write<T>
 {
-    value.write(writer);
-}
-
-template <typename T, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
-inline T read_finite(Reader & reader)
-{
-    return read<T>(reader);
-}
+    template <typename = std::enable_if<rw_class_traits<T>::has_pod>::type>
+    write(Writer &writer, typename rw_class_traits<T>::value_type value)
+    {
+        value.write(writer);
+    }
+    template <typename = std::enable_if<rw_class_traits<T>::has_cached>::type>
+    write(Writer &writer, VariableSet &variableSet, typename rw_class_traits<T>::value_type value)
+    {
+        rw_cached_helper<T>::write(writer, variableSet, value);
+    }
+};
 
 template <typename T>
-inline T read_checked(Reader & reader, function<bool(T)> checkFn)
+struct read_finite;
+
+template <typename T, typename = std::enable_if<std::is_integral<T>::value>::type>
+struct read_finite<T> : public read<T>
 {
-    T retval = read<T>(reader);
+    read_finite(Reader & reader)
+        : read<T>(reader)
+    {
+    }
+};
+
+template <typename T>
+inline typename rw_class_traits<T>::value_type read_checked(Reader & reader, function<bool(typename rw_class_traits<T>::value_type)> checkFn)
+{
+    typename rw_class_traits<T>::value_type retval = read<T>(reader);
     if(!checkFn(retval))
     {
         throw InvalidDataValueException("check failed in read_checked");
@@ -530,56 +606,86 @@ inline T read_checked(Reader & reader, function<bool(T)> checkFn)
     return retval;
 }
 
+template <typename T>
+struct read_limited;
+
 #define DEFINE_RW_FUNCTIONS_FOR_BASIC_INTEGER_TYPE(typeName, functionSuffix) \
-template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
-inline typeName read(Reader & reader) \
+template <> \
+struct read<typeName> : public read_base<typeName> \
 { \
-    return reader.read ## functionSuffix(); \
-} \
-template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
-inline typeName read_limited(Reader & reader, typeName minV, typeName maxV) \
+    read(Reader & reader) \
+        : read_base<typeName>(reader.read ## functionSuffix()) \
+    { \
+    } \
+}; \
+template <> \
+struct read_limited<typeName> : public read_base<typeName> \
 { \
-    return reader.readLimited ## functionSuffix(minV, maxV); \
-} \
-template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
-inline void write(Writer & writer, typeName value) \
+    read(Reader & reader, typeName minV, typeName maxV) \
+        : read_base<typeName>(reader.readLimited ## functionSuffix(minV, maxV)) \
+    { \
+    } \
+}; \
+template <> \
+struct write<typeName> \
 { \
-    writer.write ## functionSuffix(value); \
-}
+    write(Writer & writer, typeName value) \
+    { \
+        writer.write ## functionSuffix(value); \
+    } \
+};
 
 #define DEFINE_RW_FUNCTIONS_FOR_BASIC_FLOAT_TYPE(typeName, functionSuffix) \
-template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
-inline typeName read(Reader & reader) \
+template <> \
+struct read<typeName> : public read_base<typeName> \
 { \
-    return reader.read ## functionSuffix(); \
-} \
-template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
-inline typeName read_finite(Reader & reader) \
+    read(Reader & reader) \
+        : read_base<typeName>(reader.read ## functionSuffix()) \
+    { \
+    } \
+}; \
+template <> \
+struct read_limited<typeName> : public read_base<typeName> \
 { \
-    return reader.readFinite ## functionSuffix(); \
-} \
-template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
-inline typeName read_limited(Reader & reader, typeName minV, typeName maxV) \
+    read(Reader & reader, typeName minV, typeName maxV) \
+        : read_base<typeName>(reader.readLimited ## functionSuffix(minV, maxV)) \
+    { \
+    } \
+}; \
+template <> \
+struct read_finite<typeName> : public read_base<typeName>\
 { \
-    return reader.readLimited ## functionSuffix(minV, maxV); \
-} \
-template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
-inline void write(Writer & writer, typeName value) \
+    read_finite(Reader &reader) \
+        : read_base<typeName>(reader.readFinite ## functionSuffix()) \
+    { \
+    } \
+}; \
+template <> \
+struct write<typeName> \
 { \
-    writer.write ## functionSuffix(value); \
-}
+    write(Writer & writer, typeName value) \
+    { \
+        writer.write ## functionSuffix(value); \
+    } \
+};
 
 #define DEFINE_RW_FUNCTIONS_FOR_BASIC_TYPE(typeName, functionSuffix) \
-template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
-inline typeName read(Reader & reader) \
+template <> \
+struct read<typeName> : public read_base<typeName> \
 { \
-    return reader.read ## functionSuffix(); \
-} \
-template <typename T, typename std::enable_if<std::is_same<T, typeName>::value, int>::type = 0> \
-inline void write(Writer & writer, typeName value) \
+    read(Reader & reader) \
+        : read_base<typeName>(reader.read ## functionSuffix()) \
+    { \
+    } \
+}; \
+template <> \
+struct write<typeName> \
 { \
-    writer.write ## functionSuffix(value); \
-}
+    write(Writer & writer, typeName value) \
+    { \
+        writer.write ## functionSuffix(value); \
+    } \
+};
 
 DEFINE_RW_FUNCTIONS_FOR_BASIC_INTEGER_TYPE(uint8_t, U8)
 DEFINE_RW_FUNCTIONS_FOR_BASIC_INTEGER_TYPE(int8_t, S8)
@@ -598,17 +704,23 @@ DEFINE_RW_FUNCTIONS_FOR_BASIC_TYPE(bool, Bool)
 #undef DEFINE_RW_FUNCTIONS_FOR_BASIC_FLOAT_TYPE
 #undef DEFINE_RW_FUNCTIONS_FOR_BASIC_TYPE
 
-template <typename T, typename std::enable_if<std::is_enum<T>::value, int>::type = 0>
-inline T read(Reader &reader)
+template <typename T, typename = std::enable_if<std::is_enum<T>::value>::type>
+struct read<T> : public read_base<T>
 {
-    return (T)read_limited<typename enum_traits<T>::rwtype>(reader, (typename enum_traits<T>::rwtype)enum_traits<T>::minimum, (typename enum_traits<T>::rwtype)enum_traits<T>::maximum);
-}
+    read(Reader &reader)
+        : read_base<T>((T)::read_limited<typename enum_traits<T>::rwtype>(reader, enum_traits<T>::minimum, enum_traits<T>::maximum))
+    {
+    }
+};
 
-template <typename T, typename std::enable_if<std::is_enum<T>::value, int>::type = 0>
-inline void write(Writer &writer, T value)
+template <typename T, typename = std::enable_if<std::is_enum<T>::value>::type>
+struct write<T>
 {
-    write<typename enum_traits<T>::rwtype>(writer, (typename enum_traits<T>::rwtype)value);
-}
+    write(Writer &writer, T value)
+    {
+        ::write<typename enum_traits<T>::rwtype>(writer, (typename enum_traits<T>::rwtype)value);
+    }
+};
 
 class FileReader final : public Reader
 {
