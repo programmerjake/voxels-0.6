@@ -21,6 +21,9 @@
 #include "stream/stream.h"
 #include <memory>
 
+namespace stream
+{
+
 class NetworkException : public IOException
 {
 public:
@@ -63,5 +66,7 @@ public:
     ~NetworkServer();
     shared_ptr<StreamRW> accept() override;
 };
+
+}
 
 #endif // NETWORK_H_INCLUDED

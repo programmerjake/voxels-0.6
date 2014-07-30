@@ -17,9 +17,26 @@
  */
 #if 1
 #warning finish main.cpp
+#include "platform/audio.h"
+#include "platform/platform.h"
+#include "render/text.h"
+using namespace std;
+
 int main()
 {
-    return 0;
+    Audio audio(L"background13.ogg", true);
+    startGraphics();
+    shared_ptr<PlayingAudio> playingAudio = audio.play(0.5f, true);
+    Renderer r;
+    while(true)
+    {
+        Display::clear();
+        Mesh mesh = Text::mesh(L"This is a test.", RGBF(1, 0, 1));
+        mesh.append(reverse(mesh));
+        r << transform((Matrix::rotateY(-Display::timer())).concat(Matrix::translate(0, 0, -30)), mesh);
+        Display::flip(60);
+        Display::handleEvents(nullptr);
+    }
 }
 #else
 #include "client.h"

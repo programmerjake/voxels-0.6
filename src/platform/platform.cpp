@@ -45,7 +45,7 @@ double Display::realtimeTimer()
 
 namespace
 {
-struct RWOpsException : public IOException
+struct RWOpsException : public stream::IOException
 {
     RWOpsException(string str)
         : IOException(str)
@@ -53,7 +53,7 @@ struct RWOpsException : public IOException
     }
 };
 
-class RWOpsReader final : public Reader
+class RWOpsReader final : public stream::Reader
 {
 private:
     SDL_RWops * rw;
@@ -73,7 +73,7 @@ public:
             const char * str = SDL_GetError();
             if(str[0]) // non-empty string : error
                 throw RWOpsException(str);
-            throw EOFException();
+            throw stream::EOFException();
         }
         return retval;
     }
@@ -143,7 +143,7 @@ static void calcResourcePrefix()
     pResourcePrefix = new wstring(p + L"res/");
 }
 
-shared_ptr<Reader> getResourceReader(wstring resource)
+shared_ptr<stream::Reader> getResourceReader(wstring resource)
 {
     startSDL();
     string fname = string_cast<string>(getResourceFileName(resource));
@@ -1032,7 +1032,7 @@ VectorF Display::transformMouseTo3D(float x, float y, float depth)
     return VectorF(depth * scaleX() * (2 * x / width() - 1), depth * scaleY() * (1 - 2 * y / height()), -depth);
 }
 
-void Display::render(const Mesh &m)
+void Display::render(const Mesh & m, bool enableDepthBuffer)
 {
     static vector<float> vertexArray, textureCoordArray, colorArray;
     m.image.bind();
@@ -1073,5 +1073,14 @@ void Display::render(const Mesh &m)
     glVertexPointer(3, GL_FLOAT, 0, (const void *)&vertexArray[0]);
     glTexCoordPointer(2, GL_FLOAT, 0, (const void *)&textureCoordArray[0]);
     glColorPointer(4, GL_FLOAT, 0, (const void *)&colorArray[0]);
+    glDepthMask(enableDepthBuffer ? GL_TRUE : GL_FALSE);
     glDrawArrays(GL_TRIANGLES, 0, (GLint)m.triangles.size() * 3);
+}
+
+void Display::clear(ColorF color)
+{
+    glDepthMask(GL_TRUE);
+    glClearColor(color.r, color.g, color.b, color.a);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    initFrame();
 }

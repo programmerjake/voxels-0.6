@@ -12,7 +12,7 @@ class OggVorbisDecoder final : public AudioDecoder
 {
 private:
     OggVorbis_File ovf;
-    shared_ptr<Reader> reader;
+    shared_ptr<stream::Reader> reader;
     uint64_t samples;
     unsigned channels;
     unsigned sampleRate;
@@ -32,11 +32,11 @@ private:
                 dataPtr += blockSize;
             }
         }
-        catch(EOFException & e)
+        catch(stream::EOFException & e)
         {
             return readCount;
         }
-        catch(IOException & e)
+        catch(stream::IOException & e)
         {
             errno = EIO;
             return readCount;
@@ -58,7 +58,7 @@ private:
         assert(buffer.size() % channels == 0);
     }
 public:
-    OggVorbisDecoder(shared_ptr<Reader> reader)
+    OggVorbisDecoder(shared_ptr<stream::Reader> reader)
         : reader(reader)
     {
         ov_callbacks callbacks;
@@ -72,7 +72,7 @@ public:
         case 0:
             break;
         default:
-            throw IOException("invalid ogg vorbis audio");
+            throw stream::IOException("invalid ogg vorbis audio");
         }
         vorbis_info *info = ov_info(&ovf, -1);
         channels = info->channels;
@@ -86,7 +86,7 @@ public:
         if(samples == 0 || channels == 0 || sampleRate == 0)
         {
             ov_clear(&ovf);
-            throw IOException("invalid ogg vorbis audio");
+            throw stream::IOException("invalid ogg vorbis audio");
         }
     }
     virtual ~OggVorbisDecoder()

@@ -222,10 +222,10 @@ Audio::Audio(wstring resourceName, bool isStreaming)
         {
             try
             {
-                shared_ptr<Reader> preader = getResourceReader(resourceName);
+                shared_ptr<stream::Reader> preader = getResourceReader(resourceName);
                 return make_shared<OggVorbisDecoder>(preader);
             }
-            catch(IOException & e)
+            catch(stream::IOException & e)
             {
                 return make_shared<MemoryAudioDecoder>(vector<int16_t>(), getGlobalAudioSampleRate(), getGlobalAudioChannelCount());
             }
@@ -235,7 +235,7 @@ Audio::Audio(wstring resourceName, bool isStreaming)
     {
         try
         {
-            shared_ptr<Reader> preader = getResourceReader(resourceName);
+            shared_ptr<stream::Reader> preader = getResourceReader(resourceName);
             shared_ptr<AudioDecoder> decoder = make_shared<OggVorbisDecoder>(preader);
             vector<int16_t> buffer;
             buffer.resize(decoder->channelCount() * 8192);
@@ -252,7 +252,7 @@ Audio::Audio(wstring resourceName, bool isStreaming)
             shared_ptr<MemoryAudioDecoder> memDecoder = make_shared<MemoryAudioDecoder>(buffer, decoder->samplesPerSecond(), decoder->channelCount());
             data = make_shared<AudioData>([memDecoder]()->shared_ptr<AudioDecoder>{memDecoder->reset(); return memDecoder;});
         }
-        catch(IOException & e)
+        catch(stream::IOException & e)
         {
             throw AudioLoadError(string("io exception : ") + e.what());
         }

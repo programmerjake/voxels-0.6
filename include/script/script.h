@@ -519,7 +519,7 @@ namespace Scripting
             Ceil,
             Floor,
             For,
-            Last
+            DEFINE_ENUM_LIMITS(Const, For)
         };
 
         virtual ~Node()

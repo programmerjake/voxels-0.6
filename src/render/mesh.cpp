@@ -23,7 +23,7 @@ using namespace std;
 
 Renderer & Renderer::operator <<(const Mesh & m)
 {
-    Display::render(m);
+    Display::render(m, depthBufferEnabled);
     return *this;
 }
 

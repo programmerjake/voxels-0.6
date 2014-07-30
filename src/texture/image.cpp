@@ -17,7 +17,7 @@
  */
 #include "texture/image.h"
 #include "decoder/png_decoder.h"
-#include "platform/platform.h"
+#include "platform/platformgl.h"
 #include <cstring>
 #include <iostream>
 
@@ -25,11 +25,11 @@ Image::Image(wstring resourceName)
 {
     try
     {
-        shared_ptr<Reader> preader = getResourceReader(resourceName);
+        shared_ptr<stream::Reader> preader = getResourceReader(resourceName);
         PngDecoder decoder(*preader);
         data = shared_ptr<data_t>(new data_t(decoder.removeData(), decoder.width(), decoder.height(), TopToBottom));
     }
-    catch(IOException &e)
+    catch(stream::IOException &e)
     {
         throw ImageLoadError(e.what());
     }
@@ -41,7 +41,7 @@ Image::Image(unsigned w, unsigned h)
     memset((void *)data->data, 0, BytesPerPixel * w * h);
 }
 
-Image::Image(Color c)
+Image::Image(ColorI c)
 {
     data = shared_ptr<data_t>(new data_t(new uint8_t[BytesPerPixel], 1, 1, TopToBottom));
     setPixel(0, 0, c);
@@ -62,7 +62,7 @@ Image::data_t::~data_t()
     delete []data;
 }
 
-void Image::setPixel(int x, int y, Color c)
+void Image::setPixel(int x, int y, ColorI c)
 {
     if(!data)
     {
@@ -85,21 +85,20 @@ void Image::setPixel(int x, int y, Color c)
     copyOnWrite();
     data->textureValid = false;
     uint8_t *pixel = &data->data[BytesPerPixel * (x + y * data->w)];
-    pixel[0] = c.ri();
-    pixel[1] = c.gi();
-    pixel[2] = c.bi();
-    pixel[3] = c.ai();
+    pixel[0] = c.r;
+    pixel[1] = c.g;
+    pixel[2] = c.b;
+    pixel[3] = c.a;
     data->lock.unlock();
 }
 
-Color Image::getPixel(int x, int y) const
+ColorI Image::getPixel(int x, int y) const
 {
     if(!data)
     {
-        return Color();
+        return RGBAI(0, 0, 0, 0);
     }
 
-    Color retval;
     data->lock.lock();
 
     if(data->rowOrder == BottomToTop)
@@ -110,14 +109,11 @@ Color Image::getPixel(int x, int y) const
     if(y < 0 || (unsigned)y >= data->h || x < 0 || (unsigned)x >= data->w)
     {
         data->lock.unlock();
-        return Color();
+        return RGBAI(0, 0, 0, 0);
     }
 
     uint8_t *pixel = &data->data[BytesPerPixel * (x + y * data->w)];
-    retval.ri(pixel[0]);
-    retval.gi(pixel[1]);
-    retval.bi(pixel[2]);
-    retval.ai(pixel[3]);
+    ColorI retval = RGBAI(pixel[0], pixel[1], pixel[2], pixel[3]);
     data->lock.unlock();
     return retval;
 }
@@ -211,7 +207,7 @@ void Image::copyOnWrite()
     data->lock.lock();
 }
 
-void Image::write(Writer &writer, VariableSet &variableSet) const
+void Image::write(stream::Writer &writer, VariableSet &variableSet) const
 {
     if(!*this)
     {
@@ -254,7 +250,7 @@ void Image::write(Writer &writer, VariableSet &variableSet) const
     }
 }
 
-Image Image::read(Reader &reader, VariableSet &variableSet)
+Image Image::read(stream::Reader &reader, VariableSet &variableSet)
 {
     VariableSet::Descriptor<data_t> descriptor = VariableSet::Descriptor<data_t>::read(reader);
     if(!descriptor)

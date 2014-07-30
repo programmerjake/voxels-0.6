@@ -2228,13 +2228,11 @@ shared_ptr<Script> Script::parse(wstring code)
     return parser.run();
 }
 
-shared_ptr<Scripting::Node> Scripting::Node::read(Reader &reader, uint32_t nodeCount)
+shared_ptr<Scripting::Node> Scripting::Node::read(stream::Reader &reader, uint32_t nodeCount)
 {
-    Type type = readType(reader);
+    Type type = stream::read<Type>(reader);
     switch(type)
     {
-    case Type::Last:
-        break;
     case Type::Const:
         return NodeConst::read(reader, nodeCount);
     case Type::CastToString:

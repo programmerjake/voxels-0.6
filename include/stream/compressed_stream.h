@@ -25,6 +25,9 @@
 
 using namespace std;
 
+namespace stream
+{
+
 class LZ77FormatException final : public IOException
 {
 public:
@@ -304,5 +307,7 @@ public:
         writeCode();
     }
 };
+
+}
 
 #endif // COMPRESSED_STREAM_H_INCLUDED

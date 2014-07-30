@@ -753,7 +753,7 @@ template <typename T>
 struct read<T, typename std::enable_if<std::is_enum<T>::value>::type> : public read_base<T>
 {
     read(Reader &reader)
-        : read_base<T>((T)stream::read_limited<typename enum_traits<T>::rwtype>(reader, enum_traits<T>::minimum, enum_traits<T>::maximum))
+        : read_base<T>((T)(typename enum_traits<T>::rwtype)stream::read_limited<typename enum_traits<T>::rwtype>(reader, (typename enum_traits<T>::rwtype)enum_traits<T>::minimum, (typename enum_traits<T>::rwtype)enum_traits<T>::maximum))
     {
     }
 };

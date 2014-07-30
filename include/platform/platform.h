@@ -18,7 +18,6 @@
 #ifndef PLATFORM_H_INCLUDED
 #define PLATFORM_H_INCLUDED
 
-#include <GL/gl.h>
 #include <string>
 #include <memory>
 #include "util/matrix.h"
@@ -29,8 +28,6 @@
 #ifndef EVENT_H_INCLUDED
 class EventHandler;
 #endif // EVENT_H_INCLUDED
-
-void glLoadMatrix(Matrix mat);
 
 const float defaultFPS = 60;
 
@@ -239,7 +236,8 @@ namespace Display
     bool grabMouse();
     void grabMouse(bool g);
     VectorF transformMouseTo3D(float x, float y, float depth = 1.0f);
-    void render(const Mesh & m);
+    void render(const Mesh & m, bool enableDepthBuffer);
+    void clear(ColorF color = RGBAF(0, 0, 0, 0));
 }
 
 void startGraphics();

@@ -26,6 +26,9 @@
 
 using namespace std;
 
+namespace stream
+{
+
 namespace
 {
 const size_t bufferSize = 32768;
@@ -137,4 +140,6 @@ uint8_t DumpingReader::readByte()
     uint8_t retval = reader.readByte();
     cerr << "Read Byte : " << (unsigned)retval << "\n";
     return retval;
+}
+
 }

@@ -28,7 +28,7 @@ struct NodeConstArgCount : public Node
     friend class Node;
     uint32_t args[size];
 protected:
-    static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+    static shared_ptr<Node> read(stream::Reader &reader, uint32_t nodeCount)
     {
         shared_ptr<ChildClass> retval = make_shared<ChildClass>();
         for(uint32_t &v : retval->args)
@@ -38,9 +38,9 @@ protected:
         return static_pointer_cast<Node>(retval);
     }
 public:
-    virtual void write(Writer &writer) const override
+    virtual void write(stream::Writer &writer) const override
     {
-        writeType(writer, type());
+        stream::write<Type>(writer, type());
         for(uint32_t v : args)
         {
             writer.writeU32(v);
@@ -60,14 +60,14 @@ struct NodeConst final : public Node
         return Type::Const;
     }
 protected:
-    static shared_ptr<Node> read(Reader &reader, uint32_t)
+    static shared_ptr<Node> read(stream::Reader &reader, uint32_t)
     {
         return make_shared<NodeConst>(Data::read(reader));
     }
 public:
-    virtual void write(Writer &writer) const override
+    virtual void write(stream::Writer &writer) const override
     {
-        writeType(writer, type());
+        stream::write<Type>(writer, type());
         data->write(writer);
     }
     virtual shared_ptr<Data> evaluate(State &, unsigned stackDepth) const override
@@ -84,14 +84,14 @@ struct NodeLoadGlobals final : public Node
         return Type::LoadGlobals;
     }
 protected:
-    static shared_ptr<Node> read(Reader &, uint32_t)
+    static shared_ptr<Node> read(stream::Reader &, uint32_t)
     {
         return make_shared<NodeLoadGlobals>();
     }
 public:
-    virtual void write(Writer &writer) const override
+    virtual void write(stream::Writer &writer) const override
     {
-        writeType(writer, type());
+        stream::write<Type>(writer, type());
     }
     virtual shared_ptr<Data> evaluate(State &state, unsigned stackDepth) const override
     {
@@ -104,7 +104,7 @@ struct NodeCast : public Node
     uint32_t args[1];
     friend class Node;
 protected:
-    static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount, shared_ptr<NodeCast> retval)
+    static shared_ptr<Node> read(stream::Reader &reader, uint32_t nodeCount, shared_ptr<NodeCast> retval)
     {
         for(uint32_t &v : retval->args)
         {
@@ -113,9 +113,9 @@ protected:
         return static_pointer_cast<Node>(retval);
     }
 public:
-    virtual void write(Writer &writer) const override
+    virtual void write(stream::Writer &writer) const override
     {
-        writeType(writer, type());
+        stream::write<Type>(writer, type());
         for(uint32_t v : args)
         {
             writer.writeU32(v);
@@ -136,7 +136,7 @@ struct NodeCastToString final : public NodeCast
     }
     friend class Node;
 protected:
-    static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+    static shared_ptr<Node> read(stream::Reader &reader, uint32_t nodeCount)
     {
         return NodeCast::read(reader, nodeCount, make_shared<NodeCastToString>());
     }
@@ -166,7 +166,7 @@ struct NodeCastToInteger final : public NodeCast
     }
     friend class Node;
 protected:
-    static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+    static shared_ptr<Node> read(stream::Reader &reader, uint32_t nodeCount)
     {
         return NodeCast::read(reader, nodeCount, make_shared<NodeCastToInteger>());
     }
@@ -196,7 +196,7 @@ struct NodeCastToFloat final : public NodeCast
     }
     friend class Node;
 protected:
-    static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+    static shared_ptr<Node> read(stream::Reader &reader, uint32_t nodeCount)
     {
         return NodeCast::read(reader, nodeCount, make_shared<NodeCastToFloat>());
     }
@@ -243,7 +243,7 @@ struct NodeCastToVector final : public NodeCast
     }
     friend class Node;
 protected:
-    static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+    static shared_ptr<Node> read(stream::Reader &reader, uint32_t nodeCount)
     {
         return NodeCast::read(reader, nodeCount, make_shared<NodeCastToVector>());
     }
@@ -286,7 +286,7 @@ struct NodeCastToMatrix final : public NodeCast
     }
     friend class Node;
 protected:
-    static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+    static shared_ptr<Node> read(stream::Reader &reader, uint32_t nodeCount)
     {
         return NodeCast::read(reader, nodeCount, make_shared<NodeCastToMatrix>());
     }
@@ -345,7 +345,7 @@ struct NodeCastToList final : public NodeCast
     }
     friend class Node;
 protected:
-    static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+    static shared_ptr<Node> read(stream::Reader &reader, uint32_t nodeCount)
     {
         return NodeCast::read(reader, nodeCount, make_shared<NodeCastToList>());
     }
@@ -371,7 +371,7 @@ struct NodeCastToObject final : public NodeCast
     }
     friend class Node;
 protected:
-    static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+    static shared_ptr<Node> read(stream::Reader &reader, uint32_t nodeCount)
     {
         return NodeCast::read(reader, nodeCount, make_shared<NodeCastToObject>());
     }
@@ -397,7 +397,7 @@ struct NodeCastToBoolean final : public NodeCast
     }
     friend class Node;
 protected:
-    static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+    static shared_ptr<Node> read(stream::Reader &reader, uint32_t nodeCount)
     {
         return NodeCast::read(reader, nodeCount, make_shared<NodeCastToBoolean>());
     }
@@ -2792,9 +2792,9 @@ struct NodeBlock final : public Node
         }
         return retval;
     }
-    virtual void write(Writer &writer) const override
+    virtual void write(stream::Writer &writer) const override
     {
-        writeType(writer, type());
+        stream::write<Type>(writer, type());
         assert((uint32_t)nodes.size() == nodes.size() && nodes.size() != (uint32_t) - 1);
         writer.writeU32((uint32_t)nodes.size());
         for(uint32_t v : nodes)
@@ -2803,7 +2803,7 @@ struct NodeBlock final : public Node
         }
     }
 protected:
-    static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+    static shared_ptr<Node> read(stream::Reader &reader, uint32_t nodeCount)
     {
         shared_ptr<NodeBlock> retval = make_shared<NodeBlock>();
         size_t length = reader.readLimitedU32(0, (uint32_t) - 2);
@@ -2832,9 +2832,9 @@ struct NodeListLiteral final : public Node
         }
         return static_pointer_cast<Data>(retval);
     }
-    virtual void write(Writer &writer) const override
+    virtual void write(stream::Writer &writer) const override
     {
-        writeType(writer, type());
+        stream::write<Type>(writer, type());
         assert((uint32_t)nodes.size() == nodes.size() && nodes.size() != (uint32_t) - 1);
         writer.writeU32((uint32_t)nodes.size());
         for(uint32_t v : nodes)
@@ -2843,7 +2843,7 @@ struct NodeListLiteral final : public Node
         }
     }
 protected:
-    static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount)
+    static shared_ptr<Node> read(stream::Reader &reader, uint32_t nodeCount)
     {
         shared_ptr<NodeBlock> retval = make_shared<NodeBlock>();
         size_t length = reader.readLimitedU32(0, (uint32_t) - 2);
@@ -2863,14 +2863,14 @@ struct NodeNewObject final : public Node
         return Type::NewObject;
     }
 protected:
-    static shared_ptr<Node> read(Reader &, uint32_t)
+    static shared_ptr<Node> read(stream::Reader &, uint32_t)
     {
         return make_shared<NodeNewObject>();
     }
 public:
-    virtual void write(Writer &writer) const override
+    virtual void write(stream::Writer &writer) const override
     {
-        writeType(writer, type());
+        stream::write<Type>(writer, type());
     }
     virtual shared_ptr<Data> evaluate(State &, unsigned stackDepth) const override
     {
@@ -2951,7 +2951,7 @@ struct NodeInvert final : public NodeConstArgCount<1, NodeInvert>
         }
         try
         {
-            value = value.invert();
+            value = inverse(value);
         }
         catch(domain_error &)
         {

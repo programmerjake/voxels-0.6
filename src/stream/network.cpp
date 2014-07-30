@@ -24,8 +24,12 @@
 #include <errno.h>
 #include <signal.h>
 #include <netinet/tcp.h>
+#include <vector>
 
 using namespace std;
+
+namespace stream
+{
 
 namespace
 {
@@ -218,4 +222,6 @@ shared_ptr<StreamRW> NetworkServer::accept()
     shared_ptr<Reader> reader = shared_ptr<Reader>(new FileReader(fdopen(dup(fd2), "r")));
     shared_ptr<Writer> writer = shared_ptr<Writer>(new NetworkWriter(fd2));
     return shared_ptr<StreamRW>(new StreamRWWrapper(reader, writer));
+}
+
 }

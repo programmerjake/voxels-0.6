@@ -352,15 +352,15 @@ void init()
         float maxV = 1 - (top + pixelOffset) / textureYRes;
         TextureDescriptor texture = Font.tdNoOffset();
         texture = texture.subTexture(minU, maxU, minV, maxV);
-        charMesh[i] = Generate::quadrilateral(texture, VectorF(0, 0, 0), Color(1), VectorF(1, 0, 0), Color(1), VectorF(1, 1, 0), Color(1), VectorF(0, 1, 0), Color(1));
+        charMesh[i] = Generate::quadrilateral(texture, VectorF(0, 0, 0), colorizeIdentity(), VectorF(1, 0, 0), colorizeIdentity(), VectorF(1, 1, 0), colorizeIdentity(), VectorF(0, 1, 0), colorizeIdentity());
     }
 }
 
-void renderChar(Mesh dest, Matrix m, Color color, wchar_t ch)
+void renderChar(Mesh &dest, Matrix m, ColorF color, wchar_t ch)
 {
     init();
     //cout << "char:" << (char)ch << " pt:" << transform(m, VectorF(0, 0, 0)) << endl;
-    dest->add(scaleColors(color, transform(m, charMesh[translateToCodePage437(ch)])));
+    dest.append(colorize(color, transform(m, charMesh[translateToCodePage437(ch)])));
 }
 
 bool updateFromChar(float &x, float &y, float &w, float &h, wchar_t ch, const Text::TextProperties &properties)
@@ -449,11 +449,11 @@ float Text::yPos(wstring str, const TextProperties &properties)
     return h - y - 1;
 }
 
-Mesh Text::mesh(wstring str, Color color, const TextProperties &properties)
+Mesh Text::mesh(wstring str, ColorF color, const TextProperties &properties)
 {
     float x = 0, y = 0, w = 0, h = 0;
     float totalHeight = height(str, properties);
-    Mesh retval(new Mesh_t());
+    Mesh retval;
 
     for(wchar_t ch : str)
     {
