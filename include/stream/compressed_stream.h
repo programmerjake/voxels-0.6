@@ -293,10 +293,14 @@ public:
     virtual ~CompressWriter()
     {
     }
-    virtual void flush() override
+    void finish()
     {
         while(!currentInput.empty())
             writeCode();
+    }
+    virtual void flush() override
+    {
+        finish();
         writer->flush();
     }
     virtual void writeByte(uint8_t v) override

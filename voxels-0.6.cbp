@@ -74,6 +74,7 @@
 		<Unit filename="include/texture/texture_descriptor.h" />
 		<Unit filename="include/util/arena_allocator.h" />
 		<Unit filename="include/util/balanced_tree.h" />
+		<Unit filename="include/util/block_chunk.h" />
 		<Unit filename="include/util/circular_deque.h" />
 		<Unit filename="include/util/color.h" />
 		<Unit filename="include/util/dimension.h" />

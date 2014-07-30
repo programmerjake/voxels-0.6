@@ -175,6 +175,8 @@ public:
     }
 };
 
+#warning write modification tracker
+
 namespace stream
 {
 template <typename T>
@@ -187,7 +189,7 @@ struct rw_cached_helper<T, typename std::enable_if<rw_class_traits_helper_has_re
     }
     static void write(Writer &writer, VariableSet &variableSet, value_type value)
     {
-        return variableSet.write_helper<T>(writer, value, is_value_modified<T>()(value));
+        return variableSet.write_helper<T>(writer, value, is_value_modified<T>()(value, variableSet));
     }
 };
 }

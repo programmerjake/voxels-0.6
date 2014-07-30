@@ -3,4 +3,11 @@
 
 #include "mesh.h"
 
+class RenderObjectWorld
+{
+
+};
+
+class RenderObjectBlock
+
 #endif // RENDER_OBJECT_H_INCLUDED

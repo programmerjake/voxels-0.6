@@ -471,20 +471,14 @@ struct read;
 template <typename T>
 struct is_value_modified
 {
-    constexpr bool operator ()(std::shared_ptr<const T>) const
+    constexpr bool operator ()(std::shared_ptr<const T>, VariableSet &) const
     {
         return false;
     }
 };
 
 template <typename T, typename = void>
-struct write
-{
-    template <typename VariableType>
-    write(Writer &writer, VariableType value) = delete;
-    template <typename VariableType>
-    write(Writer &writer, VariableSet &variableSet, VariableType value) = delete;
-};
+struct write;
 
 struct rw_class_traits_helper
 {
@@ -599,6 +593,10 @@ struct read<T, typename std::enable_if<std::is_class<T>::value && rw_class_trait
         : read_base<typename rw_class_traits<T>::value_type>(T::read(reader))
     {
     }
+    read(Reader &reader, VariableSet &)
+        : read(reader)
+    {
+    }
 };
 
 template <typename T>
@@ -614,6 +612,10 @@ template <typename T>
 struct write<T, typename std::enable_if<std::is_class<T>::value && rw_class_traits<T>::has_pod>::type>
 {
     write(Writer &writer, typename rw_class_traits<T>::value_type value)
+    {
+        value.write(writer);
+    }
+    write(Writer &writer, VariableSet &, typename rw_class_traits<T>::value_type value)
     {
         value.write(writer);
     }
@@ -662,6 +664,10 @@ struct read<typeName, void> : public read_base<typeName> \
         : read_base<typeName>(reader.read ## functionSuffix()) \
     { \
     } \
+    read(Reader &reader, VariableSet &) \
+        : read(reader) \
+    { \
+    } \
 }; \
 template <> \
 struct read_limited<typeName> : public read_base<typeName> \
@@ -678,6 +684,10 @@ struct write<typeName, void> \
     { \
         writer.write ## functionSuffix(value); \
     } \
+    write(Writer &writer, VariableSet &, typeName value) \
+        : write(writer, value) \
+    { \
+    } \
 };
 
 #define DEFINE_RW_FUNCTIONS_FOR_BASIC_FLOAT_TYPE(typeName, functionSuffix) \
@@ -686,6 +696,10 @@ struct read<typeName, void> : public read_base<typeName> \
 { \
     read(Reader & reader) \
         : read_base<typeName>(reader.read ## functionSuffix()) \
+    { \
+    } \
+    read(Reader &reader, VariableSet &) \
+        : read(reader) \
     { \
     } \
 }; \
@@ -712,6 +726,10 @@ struct write<typeName, void> \
     { \
         writer.write ## functionSuffix(value); \
     } \
+    write(Writer &writer, VariableSet &, typeName value) \
+        : write(writer, value) \
+    { \
+    } \
 };
 
 #define DEFINE_RW_FUNCTIONS_FOR_BASIC_TYPE(typeName, functionSuffix) \
@@ -722,6 +740,10 @@ struct read<typeName, void> : public read_base<typeName> \
         : read_base<typeName>(reader.read ## functionSuffix()) \
     { \
     } \
+    read(Reader &reader, VariableSet &) \
+        : read(reader) \
+    { \
+    } \
 }; \
 template <> \
 struct write<typeName, void> \
@@ -729,6 +751,10 @@ struct write<typeName, void> \
     write(Writer & writer, typeName value) \
     { \
         writer.write ## functionSuffix(value); \
+    } \
+    write(Writer &writer, VariableSet &, typeName value) \
+        : write(writer, value) \
+    { \
     } \
 };
 
@@ -756,6 +782,10 @@ struct read<T, typename std::enable_if<std::is_enum<T>::value>::type> : public r
         : read_base<T>((T)(typename enum_traits<T>::rwtype)stream::read_limited<typename enum_traits<T>::rwtype>(reader, (typename enum_traits<T>::rwtype)enum_traits<T>::minimum, (typename enum_traits<T>::rwtype)enum_traits<T>::maximum))
     {
     }
+    read(Reader &reader, VariableSet &)
+        : read(reader)
+    {
+    }
 };
 
 template <typename T>
@@ -764,6 +794,10 @@ struct write<T, typename std::enable_if<std::is_enum<T>::value>::type>
     write(Writer &writer, T value)
     {
         stream::write<typename enum_traits<T>::rwtype>(writer, (typename enum_traits<T>::rwtype)value);
+    }
+    write(Writer &writer, VariableSet &, T value)
+        : write(writer, value)
+    {
     }
 };
 
