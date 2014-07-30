@@ -75,9 +75,6 @@ namespace Scripting
                 return L"string";
             case Type::Boolean:
                 return L"boolean";
-            case Type::Last:
-                assert(false);
-                return L"unknown";
             }
             assert(false);
             return L"unknown";
@@ -102,8 +99,6 @@ namespace Scripting
         {
             stream::write<Type>(writer, type());
             stream::write<bool>(writer, value);
-            writeType(writer, type());
-            writer.writeBool(value);
         }
         friend class Data;
     private:
@@ -138,14 +133,14 @@ namespace Scripting
         }
         virtual void write(stream::Writer &writer) const override
         {
-            writeType(writer, type());
+            stream::write<Type>(writer, type());
             writer.writeS32(value);
         }
         friend class Data;
     private:
-        static shared_ptr<DataInteger> read(Reader &reader)
+        static shared_ptr<DataInteger> read(stream::Reader &reader)
         {
-            return make_shared<DataInteger>(reader.readS32());
+            return make_shared<DataInteger>(stream::read<int32_t>(reader));
         }
     public:
         virtual explicit operator wstring() const override
@@ -170,14 +165,14 @@ namespace Scripting
         {
             return shared_ptr<Data>(new DataFloat(value));
         }
-        virtual void write(Writer &writer) const override
+        virtual void write(stream::Writer &writer) const override
         {
-            writeType(writer, type());
+            stream::write<Type>(writer, type());
             writer.writeF32(value);
         }
         friend class Data;
     private:
-        static shared_ptr<DataFloat> read(Reader &reader)
+        static shared_ptr<DataFloat> read(stream::Reader &reader)
         {
             return make_shared<DataFloat>(reader.readFiniteF32());
         }
@@ -204,16 +199,16 @@ namespace Scripting
         {
             return shared_ptr<Data>(new DataVector(value));
         }
-        virtual void write(Writer &writer) const override
+        virtual void write(stream::Writer &writer) const override
         {
-            writeType(writer, type());
+            stream::write<Type>(writer, type());
             writer.writeF32(value.x);
             writer.writeF32(value.y);
             writer.writeF32(value.z);
         }
         friend class Data;
     private:
-        static shared_ptr<DataVector> read(Reader &reader)
+        static shared_ptr<DataVector> read(stream::Reader &reader)
         {
             VectorF value;
             value.x = reader.readFiniteF32();
@@ -244,9 +239,9 @@ namespace Scripting
         {
             return shared_ptr<Data>(new DataMatrix(value));
         }
-        virtual void write(Writer &writer) const override
+        virtual void write(stream::Writer &writer) const override
         {
-            writeType(writer, type());
+            stream::write<Type>(writer, type());
             for(int x = 0; x < 4; x++)
                 for(int y = 0; y < 3; y++)
                 {
@@ -255,7 +250,7 @@ namespace Scripting
         }
         friend class Data;
     private:
-        static shared_ptr<DataMatrix> read(Reader &reader)
+        static shared_ptr<DataMatrix> read(stream::Reader &reader)
         {
             Matrix value;
             for(int x = 0; x < 4; x++)
@@ -307,9 +302,9 @@ namespace Scripting
             }
             return static_pointer_cast<Data>(retval);
         }
-        virtual void write(Writer &writer) const override
+        virtual void write(stream::Writer &writer) const override
         {
-            writeType(writer, type());
+            stream::write<Type>(writer, type());
             assert((uint32_t)value.size() == value.size() && value.size() != (uint32_t) - 1);
             writer.writeU32((uint32_t)value.size());
             for(shared_ptr<Data> v : value)
@@ -320,7 +315,7 @@ namespace Scripting
         }
         friend class Data;
     private:
-        static shared_ptr<DataList> read(Reader &reader)
+        static shared_ptr<DataList> read(stream::Reader &reader)
         {
             shared_ptr<DataList> retval = make_shared<DataList>();
             size_t length = reader.readLimitedU32(0, (uint32_t) - 2);
@@ -373,9 +368,9 @@ namespace Scripting
             }
             return static_pointer_cast<Data>(retval);
         }
-        virtual void write(Writer &writer) const override
+        virtual void write(stream::Writer &writer) const override
         {
-            writeType(writer, type());
+            stream::write<Type>(writer, type());
             assert((uint32_t)value.size() == value.size() && value.size() != (uint32_t) - 1);
             writer.writeU32((uint32_t)value.size());
             for(pair<wstring, shared_ptr<Data>> v : value)
@@ -387,7 +382,7 @@ namespace Scripting
         }
         friend class Data;
     private:
-        static shared_ptr<DataObject> read(Reader &reader)
+        static shared_ptr<DataObject> read(stream::Reader &reader)
         {
             shared_ptr<DataObject> retval = make_shared<DataObject>();
             size_t length = reader.readLimitedU32(0, (uint32_t) - 2);
@@ -431,14 +426,14 @@ namespace Scripting
         {
             return shared_ptr<Data>(new DataString(value));
         }
-        virtual void write(Writer &writer) const override
+        virtual void write(stream::Writer &writer) const override
         {
-            writeType(writer, type());
+            stream::write<Type>(writer, type());
             writer.writeString(value);
         }
         friend class Data;
     private:
-        static shared_ptr<DataString> read(Reader &reader)
+        static shared_ptr<DataString> read(stream::Reader &reader)
         {
             return make_shared<DataString>(reader.readString());
         }
@@ -463,7 +458,7 @@ namespace Scripting
     class State;
     struct Node : public enable_shared_from_this<Node>
     {
-        enum class Type : uint_fast16_t
+        enum class Type : uint16_t
         {
             Const,
             CastToString,
@@ -527,23 +522,13 @@ namespace Scripting
             Last
         };
 
-        static Type readType(Reader &reader)
-        {
-            return (Type)reader.readLimitedU16(0, (uint16_t)Type::Last);
-        }
-
-        static void writeType(Writer &writer, Type type)
-        {
-            writer.writeU16((uint16_t)type);
-        }
-
         virtual ~Node()
         {
         }
         virtual Type type() const = 0;
         virtual shared_ptr<Data> evaluate(State &state, unsigned stackDepth = 0) const = 0;
-        virtual void write(Writer &writer) const = 0;
-        static shared_ptr<Node> read(Reader &reader, uint32_t nodeCount);
+        virtual void write(stream::Writer &writer) const = 0;
+        static shared_ptr<Node> read(stream::Reader &reader, uint32_t nodeCount);
     protected:
         static void checkStackDepth(unsigned stackDepth)
         {
@@ -635,7 +620,7 @@ public:
         return dynamic_pointer_cast<Scripting::DataBoolean>(retval)->value;
     }
     static shared_ptr<Script> parse(wstring code);
-    static shared_ptr<Script> read(Reader &reader)
+    static shared_ptr<Script> read(stream::Reader &reader, VariableSet &)
     {
         uint32_t nodeCount = reader.readU32();
         auto retval = make_shared<Script>();
@@ -646,7 +631,7 @@ public:
         }
         return retval;
     }
-    void write(Writer &writer)
+    void write(stream::Writer &writer, VariableSet &)
     {
         writer.writeU32(nodes.size());
         for(auto n : nodes)
@@ -654,19 +639,11 @@ public:
             n->write(writer);
         }
     }
-    static shared_ptr<Script> read(Reader &reader, VariableSet &)
-    {
-        return read(reader);
-    }
-    void write(Writer &writer, VariableSet &)
-    {
-        return write(writer);
-    }
 };
 
-inline shared_ptr<Scripting::Data> Scripting::Data::read(Reader &reader)
+inline shared_ptr<Scripting::Data> Scripting::Data::read(stream::Reader &reader)
 {
-    Type type = readType(reader);
+    Type type = stream::read<Type>(reader);
     switch(type)
     {
     case Type::Boolean:
@@ -685,8 +662,6 @@ inline shared_ptr<Scripting::Data> Scripting::Data::read(Reader &reader)
         return static_pointer_cast<Data>(DataObject::read(reader));
     case Type::String:
         return static_pointer_cast<Data>(DataString::read(reader));
-    case Type::Last:
-        break;
     }
     assert(false);
 }

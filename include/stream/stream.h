@@ -466,16 +466,12 @@ public:
 };
 
 template <typename T, typename = void>
-struct read
-{
-    read(Reader &reader) = delete;
-    read(Reader &reader, VariableSet &variableSet) = delete;
-};
+struct read;
 
 template <typename T>
 struct is_value_modified
 {
-    constexpr bool operator ()(const T &) const
+    constexpr bool operator ()(std::shared_ptr<const T>) const
     {
         return false;
     }
@@ -509,7 +505,7 @@ private:
     struct no
     {
     };
-    template <typename ReturnType, ReturnType (T::*)(Reader &, VariableSet &) = &T::read>
+    template <std::shared_ptr<T> (*)(Reader &, VariableSet &) = &T::read>
     static yes f(const T *);
     static no f(...);
 public:
@@ -539,10 +535,10 @@ struct rw_class_traits_helper_has_read_with_VariableSet<T, true>
     typedef decltype(T::read(rw_class_traits_helper::readerRef(), rw_class_traits_helper::variableSetRef())) value_type;
 };
 
-template <typename T, typename = void>
+template <typename T, bool = std::is_class<T>::value>
 struct rw_class_traits_helper_has_read_without_VariableSet_helper;
 template <typename T>
-class rw_class_traits_helper_has_read_without_VariableSet_helper<T, typename std::enable_if<std::is_class<T>::value>::type>
+class rw_class_traits_helper_has_read_without_VariableSet_helper<T, true>
 {
 private:
     struct yes
@@ -551,7 +547,7 @@ private:
     struct no
     {
     };
-    template <typename ReturnType, ReturnType (T::*)(Reader &) = &T::read>
+    template <T (*)(Reader &) = &T::read>
     static yes f(const T *);
     static no f(...);
 public:
@@ -559,7 +555,7 @@ public:
 };
 
 template <typename T>
-struct rw_class_traits_helper_has_read_without_VariableSet_helper<T, typename std::enable_if<!std::is_class<T>::value>::type>
+struct rw_class_traits_helper_has_read_without_VariableSet_helper<T, false>
 {
     static constexpr bool value = false;
 };
@@ -597,14 +593,17 @@ struct rw_class_traits
 };
 
 template <typename T>
-struct read<T, typename std::enable_if<std::is_class<T>::value && (rw_class_traits<T>::has_pod || rw_class_traits<T>::has_cached)>::type> : public read_base<typename rw_class_traits<T>::value_type>
+struct read<T, typename std::enable_if<std::is_class<T>::value && rw_class_traits<T>::has_pod>::type> : public read_base<typename rw_class_traits<T>::value_type>
 {
-    template <typename = typename std::enable_if<rw_class_traits<T>::has_pod>::type>
     read(Reader &reader)
         : read_base<typename rw_class_traits<T>::value_type>(T::read(reader))
     {
     }
-    template <typename = typename std::enable_if<rw_class_traits<T>::has_cached>::type>
+};
+
+template <typename T>
+struct read<T, typename std::enable_if<std::is_class<T>::value && rw_class_traits<T>::has_cached>::type> : public read_base<typename rw_class_traits<T>::value_type>
+{
     read(Reader &reader, VariableSet &variableSet)
         : read_base<typename rw_class_traits<T>::value_type>(rw_cached_helper<T>::read(reader, variableSet))
     {
@@ -612,14 +611,17 @@ struct read<T, typename std::enable_if<std::is_class<T>::value && (rw_class_trai
 };
 
 template <typename T>
-struct write<T, typename std::enable_if<std::is_class<T>::value && (rw_class_traits<T>::has_pod || rw_class_traits<T>::has_cached)>::type>
+struct write<T, typename std::enable_if<std::is_class<T>::value && rw_class_traits<T>::has_pod>::type>
 {
-    template <typename = typename std::enable_if<rw_class_traits<T>::has_pod>::type>
     write(Writer &writer, typename rw_class_traits<T>::value_type value)
     {
         value.write(writer);
     }
-    template <typename = typename std::enable_if<rw_class_traits<T>::has_cached>::type>
+};
+
+template <typename T>
+struct write<T, typename std::enable_if<std::is_class<T>::value && rw_class_traits<T>::has_cached>::type>
+{
     write(Writer &writer, VariableSet &variableSet, typename rw_class_traits<T>::value_type value)
     {
         rw_cached_helper<T>::write(writer, variableSet, value);
@@ -1008,3 +1010,4 @@ public:
 }
 
 #endif // STREAM_H
+#include "util/variable_set.h"

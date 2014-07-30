@@ -34,7 +34,7 @@ void glLoadMatrix(Matrix mat);
 
 const float defaultFPS = 60;
 
-shared_ptr<Reader> getResourceReader(wstring resource);
+shared_ptr<stream::Reader> getResourceReader(wstring resource);
 
 enum KeyboardKey
 {

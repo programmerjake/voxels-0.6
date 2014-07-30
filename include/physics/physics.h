@@ -43,21 +43,19 @@ struct PhysicsProperties final
         : bounceFactor(limit(bounceFactor, 0.0f, 1.0f)), slideFactor(limit(slideFactor, 0.0f, 1.0f))
     {
     }
-    static PhysicsProperties read(Reader & reader)
+    static PhysicsProperties read(stream::Reader & reader)
     {
         PhysicsProperties retval;
-        retval.bounceFactor = reader.readLimitedF32(0, 1);
-        retval.slideFactor = reader.readLimitedF32(0, 1);
+        retval.bounceFactor = stream::read_limited<float32_t>(reader, 0, 1);
+        retval.slideFactor = stream::read_limited<float32_t>(reader, 0, 1);
         return retval;
     }
-    void write(Writer & writer) const
+    void write(stream::Writer & writer) const
     {
-        writer.writeF32(bounceFactor);
-        writer.writeF32(slideFactor);
+        stream::write<float32_t>(writer, bounceFactor);
+        stream::write<float32_t>(writer, slideFactor);
     }
 };
-
-
 
 class PhysicsConstraint final
 {
@@ -75,16 +73,25 @@ public:
     }
 };
 
-template <typename T, typename std::enable_if<std::is_same<PhysicsConstraint, T>::value, int>::type = 0>
-inline PhysicsConstraint read(Reader &reader, VariableSet &variableSet)
+namespace stream
 {
-    return PhysicsConstraint(read<Script>(reader, variableSet));
-}
+template <>
+struct read<PhysicsConstraint> : public read_base<PhysicsConstraint>
+{
+    read(Reader &reader, VariableSet &variableSet)
+        : read_base<PhysicsConstraint>(PhysicsConstraint(stream::read<Script>(reader, variableSet)))
+    {
+    }
+};
 
-template <typename T, typename std::enable_if<std::is_same<PhysicsConstraint, T>::value, int>::type = 0>
-inline void write(Writer &writer, VariableSet &variableSet, PhysicsConstraint value)
+template <>
+struct write<PhysicsConstraint>
 {
-    write<Script>(writer, variableSet, value.getScript());
+    write(Writer &writer, VariableSet &variableSet, PhysicsConstraint value)
+    {
+        stream::write<Script>(writer, variableSet, value.getScript());
+    }
+};
 }
 
 class PhysicsObject final : public enable_shared_from_this<PhysicsObject>
