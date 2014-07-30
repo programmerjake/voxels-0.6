@@ -41,19 +41,19 @@ void pngloadwarning(png_structp, png_const_charp)
 void readBytes(png_structp png_ptr, png_bytep output, png_size_t count)
 {
     png_voidp user_data = png_get_io_ptr(png_ptr);
-    Reader & reader = *(Reader *)user_data;
+    stream::Reader & reader = *(stream::Reader *)user_data;
     try
     {
         reader.readBytes((uint8_t *)output, count);
     }
-    catch(IOException & e)
+    catch(stream::IOException & e)
     {
         *(string *)png_get_error_ptr(png_ptr) = e.what();
         longjmp(png_jmpbuf(png_ptr), 1);
     }
 }
 
-inline bool LoadPNG(Reader * preader, uint8_t *&pixels, unsigned &width, unsigned &height, string &errorMsg)
+inline bool LoadPNG(stream::Reader * preader, uint8_t *&pixels, unsigned &width, unsigned &height, string &errorMsg)
 {
     png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, (void *)&errorMsg, pngloaderror, pngloadwarning);
     if(!png_ptr)
@@ -135,7 +135,7 @@ inline bool LoadPNG(Reader * preader, uint8_t *&pixels, unsigned &width, unsigne
 
 }
 
-PngDecoder::PngDecoder(Reader & reader)
+PngDecoder::PngDecoder(stream::Reader & reader)
 {
     string errorMsg;
     if(!LoadPNG(&reader, data, w, h, errorMsg))

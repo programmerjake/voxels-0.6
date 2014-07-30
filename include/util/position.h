@@ -135,16 +135,16 @@ struct PositionI : public VectorI
     {
         return (VectorI)l - (VectorI)r;
     }
-    static PositionI read(Reader &reader)
+    static PositionI read(stream::Reader &reader)
     {
-        VectorI v = ::read<VectorI>(reader);
-        Dimension d = ::read<Dimension>(reader);
+        VectorI v = VectorI::read(reader);
+        Dimension d = stream::read<Dimension>(reader);
         return PositionI(v, d);
     }
-    void write(Writer &writer) const
+    void write(stream::Writer &writer) const
     {
         VectorI::write(writer);
-        ::write<Dimension>(writer, d);
+        stream::write<Dimension>(writer, d);
     }
 };
 
@@ -325,16 +325,16 @@ struct PositionF : public VectorF
     {
         return (VectorF)l - (VectorI)r;
     }
-    static PositionF read(Reader &reader)
+    static PositionF read(stream::Reader &reader)
     {
-        VectorF v = ::read<VectorF>(reader);
-        Dimension d = ::read<Dimension>(reader);
+        VectorF v = VectorF::read(reader);
+        Dimension d = stream::read<Dimension>(reader);
         return PositionF(v, d);
     }
-    void write(Writer &writer) const
+    void write(stream::Writer &writer) const
     {
         VectorF::write(writer);
-        ::write<Dimension>(writer, d);
+        stream::write<Dimension>(writer, d);
     }
 };
 

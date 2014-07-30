@@ -80,8 +80,8 @@ public:
     {
         return l.data != r.data;
     }
-    void write(Writer &writer, VariableSet &variableSet) const;
-    static Image read(Reader &reader, VariableSet &variableSet);
+    void write(stream::Writer &writer, VariableSet &variableSet) const;
+    static Image read(stream::Reader &reader, VariableSet &variableSet);
 private:
     enum RowOrder
     {
@@ -113,16 +113,25 @@ private:
     void copyOnWrite();
 };
 
-template <typename T, typename std::enable_if<std::is_same<Image, T>::value, int>::type = 0>
-inline Image read(Reader &reader, VariableSet &variableSet)
+namespace stream
 {
-    return Image::read(reader, variableSet);
-}
+template <>
+struct read<Image> : public read_base<Image>
+{
+    read(Reader &reader, VariableSet &variableSet)
+        : read_base<Image>(Image::read(reader, variableSet))
+    {
+    }
+};
 
-template <typename T, typename std::enable_if<std::is_same<Image, T>::value, int>::type = 0>
-inline void write(Writer &writer, VariableSet &variableSet, Image value)
+template <>
+struct write<Image>
 {
-    value.write(writer, variableSet);
+    write(Writer &writer, VariableSet &variableSet, Image value)
+    {
+        value.write(writer, variableSet);
+    }
+};
 }
 
 #endif // IMAGE_H

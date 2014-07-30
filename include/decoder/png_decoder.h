@@ -25,7 +25,7 @@
 
 using namespace std;
 
-class PngLoadError final : public IOException
+class PngLoadError final : public stream::IOException
 {
 public:
     explicit PngLoadError(const string & arg)
@@ -45,7 +45,7 @@ private:
     PngDecoder(const PngDecoder &) = delete;
     const PngDecoder &operator =(const PngDecoder &) = delete;
 public:
-    explicit PngDecoder(Reader & reader);
+    explicit PngDecoder(stream::Reader & reader);
     PngDecoder(PngDecoder && rt)
     {
         w = rt.w;

@@ -67,11 +67,11 @@ public:
         {
             return descriptorIndex == 0;
         }
-        static Descriptor read(Reader & reader)
+        static Descriptor read(stream::Reader & reader)
         {
             return Descriptor(reader.readU64());
         }
-        void write(Writer & writer) const
+        void write(stream::Writer & writer) const
         {
             writer.writeU64(descriptorIndex);
         }
@@ -143,13 +143,13 @@ public:
         return make_pair(Descriptor<T>(std::get<0>(std::get<1>(*iter))), true);
     }
     template <typename T>
-    shared_ptr<T> read_helper(Reader &reader)
+    shared_ptr<T> read_helper(stream::Reader &reader)
     {
-        Descriptor<T> descriptor = ::read<Descriptor<T>>(reader);
+        Descriptor<T> descriptor = stream::read<Descriptor<T>>(reader);
         if(!descriptor)
             return nullptr;
         shared_ptr<T> retval = get(descriptor);
-        bool modified = ::read<bool>(reader);
+        bool modified = stream::read<bool>(reader);
         if(retval != nullptr && !modified)
             return retval;
         retval = T::read(reader, *this);
@@ -157,16 +157,16 @@ public:
         return retval;
     }
     template <typename T>
-    void write_helper(Writer &writer, shared_ptr<T> value, bool modified)
+    void write_helper(stream::Writer &writer, shared_ptr<T> value, bool modified)
     {
         if(value == nullptr)
         {
-            ::write<Descriptor<T>>(writer, Descriptor<T>::null());
+            stream::write<Descriptor<T>>(writer, Descriptor<T>::null());
             return;
         }
         pair<Descriptor<T>, bool> findOrMakeReturnValue = findOrMake<T>(value);
-        ::write<Descriptor<T>>(writer, std::get<0>(findOrMakeReturnValue));
-        ::write<bool>(writer, modified || !std::get<1>(findOrMakeReturnValue));
+        stream::write<Descriptor<T>>(writer, std::get<0>(findOrMakeReturnValue));
+        stream::write<bool>(writer, modified || !std::get<1>(findOrMakeReturnValue));
         if(std::get<1>(findOrMakeReturnValue) && !modified)
         {
             return;
@@ -175,20 +175,21 @@ public:
     }
 };
 
+namespace stream
+{
 template <typename T>
 struct rw_cached_helper<T, typename std::enable_if<rw_class_traits_helper_has_read_with_VariableSet<T>::value>::type>
 {
     typedef typename rw_class_traits_helper_has_read_with_VariableSet<T>::value_type value_type;
-    template <typename VariableSetT, typename = std::enable_if<std::is_same<VariableSetT, VariableSet>::value>>
-    static value_type read(Reader &reader, VariableSetT &variableSet)
+    static value_type read(Reader &reader, VariableSet &variableSet)
     {
         return variableSet.read_helper<T>(reader);
     }
-    template <typename VariableSetT, typename = std::enable_if<std::is_same<VariableSetT, VariableSet>::value>>
-    static void write(Writer &writer, VariableSetT &variableSet, value_type value)
+    static void write(Writer &writer, VariableSet &variableSet, value_type value)
     {
         return variableSet.write_helper<T>(writer, value, is_value_modified<T>()(value));
     }
 };
+}
 
 #endif // VARIABLE_SET_H_INCLUDED

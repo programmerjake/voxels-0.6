@@ -341,48 +341,48 @@ struct Matrix
         return rotateY(theta).concat(t);
     }
 
-    static Matrix read(Reader &reader)
+    static Matrix read(stream::Reader &reader)
     {
-        float x00 = ::read_finite<float32_t>(reader);
-        float x01 = ::read_finite<float32_t>(reader);
-        float x02 = ::read_finite<float32_t>(reader);
-        float x03 = ::read_finite<float32_t>(reader);
-        float x10 = ::read_finite<float32_t>(reader);
-        float x11 = ::read_finite<float32_t>(reader);
-        float x12 = ::read_finite<float32_t>(reader);
-        float x13 = ::read_finite<float32_t>(reader);
-        float x20 = ::read_finite<float32_t>(reader);
-        float x21 = ::read_finite<float32_t>(reader);
-        float x22 = ::read_finite<float32_t>(reader);
-        float x23 = ::read_finite<float32_t>(reader);
-        float x30 = ::read_finite<float32_t>(reader);
-        float x31 = ::read_finite<float32_t>(reader);
-        float x32 = ::read_finite<float32_t>(reader);
-        float x33 = ::read_finite<float32_t>(reader);
+        float x00 = stream::read_finite<float32_t>(reader);
+        float x01 = stream::read_finite<float32_t>(reader);
+        float x02 = stream::read_finite<float32_t>(reader);
+        float x03 = stream::read_finite<float32_t>(reader);
+        float x10 = stream::read_finite<float32_t>(reader);
+        float x11 = stream::read_finite<float32_t>(reader);
+        float x12 = stream::read_finite<float32_t>(reader);
+        float x13 = stream::read_finite<float32_t>(reader);
+        float x20 = stream::read_finite<float32_t>(reader);
+        float x21 = stream::read_finite<float32_t>(reader);
+        float x22 = stream::read_finite<float32_t>(reader);
+        float x23 = stream::read_finite<float32_t>(reader);
+        float x30 = stream::read_finite<float32_t>(reader);
+        float x31 = stream::read_finite<float32_t>(reader);
+        float x32 = stream::read_finite<float32_t>(reader);
+        float x33 = stream::read_finite<float32_t>(reader);
         return Matrix(x00, x10, x20, x30,
                        x01, x11, x21, x31,
                        x02, x12, x22, x32,
                        x03, x13, x23, x33);
     }
 
-    void write(Writer &writer) const
+    void write(stream::Writer &writer) const
     {
-        ::write<float32_t>(writer, x00);
-        ::write<float32_t>(writer, x01);
-        ::write<float32_t>(writer, x02);
-        ::write<float32_t>(writer, x03);
-        ::write<float32_t>(writer, x10);
-        ::write<float32_t>(writer, x11);
-        ::write<float32_t>(writer, x12);
-        ::write<float32_t>(writer, x13);
-        ::write<float32_t>(writer, x20);
-        ::write<float32_t>(writer, x21);
-        ::write<float32_t>(writer, x22);
-        ::write<float32_t>(writer, x23);
-        ::write<float32_t>(writer, x30);
-        ::write<float32_t>(writer, x31);
-        ::write<float32_t>(writer, x32);
-        ::write<float32_t>(writer, x33);
+        stream::write<float32_t>(writer, x00);
+        stream::write<float32_t>(writer, x01);
+        stream::write<float32_t>(writer, x02);
+        stream::write<float32_t>(writer, x03);
+        stream::write<float32_t>(writer, x10);
+        stream::write<float32_t>(writer, x11);
+        stream::write<float32_t>(writer, x12);
+        stream::write<float32_t>(writer, x13);
+        stream::write<float32_t>(writer, x20);
+        stream::write<float32_t>(writer, x21);
+        stream::write<float32_t>(writer, x22);
+        stream::write<float32_t>(writer, x23);
+        stream::write<float32_t>(writer, x30);
+        stream::write<float32_t>(writer, x31);
+        stream::write<float32_t>(writer, x32);
+        stream::write<float32_t>(writer, x33);
     }
 };
 

@@ -24,6 +24,7 @@
 #include "render/mesh.h"
 #include <unordered_map>
 #include "util/variable_set.h"
+#include "util/enum_traits.h"
 #include <sstream>
 #include <cmath>
 #include <iostream>
@@ -44,23 +45,15 @@ namespace Scripting
             List,
             Object,
             String,
-            Last
+            DEFINE_ENUM_LIMITS(Boolean, String)
         };
-        static void writeType(Writer &writer, Type type)
-        {
-            writer.writeU8((uint8_t)type);
-        }
-        static Type readType(Reader &reader)
-        {
-            return (Type)reader.readLimitedU8(0, (uint8_t)Type::Last);
-        }
         virtual Type type() const = 0;
         virtual ~Data()
         {
         }
         virtual shared_ptr<Data> dup() const = 0;
-        virtual void write(Writer &writer) const = 0;
-        static shared_ptr<Data> read(Reader &reader);
+        virtual void write(stream::Writer &writer) const = 0;
+        static shared_ptr<Data> read(stream::Reader &reader);
         virtual explicit operator wstring() const = 0;
         wstring typeString() const
         {
@@ -105,16 +98,18 @@ namespace Scripting
         {
             return shared_ptr<Data>(new DataBoolean(value));
         }
-        virtual void write(Writer &writer) const override
+        virtual void write(stream::Writer &writer) const override
         {
+            stream::write<Type>(writer, type());
+            stream::write<bool>(writer, value);
             writeType(writer, type());
             writer.writeBool(value);
         }
         friend class Data;
     private:
-        static shared_ptr<DataBoolean> read(Reader &reader)
+        static shared_ptr<DataBoolean> read(stream::Reader &reader)
         {
-            return make_shared<DataBoolean>(reader.readBool());
+            return make_shared<DataBoolean>(stream::read<bool>(reader));
         }
     public:
         virtual explicit operator wstring() const override
@@ -141,7 +136,7 @@ namespace Scripting
         {
             return shared_ptr<Data>(new DataInteger(value));
         }
-        virtual void write(Writer &writer) const override
+        virtual void write(stream::Writer &writer) const override
         {
             writeType(writer, type());
             writer.writeS32(value);

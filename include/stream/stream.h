@@ -41,6 +41,14 @@
 
 using namespace std;
 
+typedef float float32_t;
+typedef double float64_t;
+
+struct VariableSet;
+
+namespace stream
+{
+
 class IOException : public runtime_error
 {
 public:
@@ -95,9 +103,6 @@ public:
     {
     }
 };
-
-typedef float float32_t;
-typedef double float64_t;
 
 class Reader
 {
@@ -460,8 +465,6 @@ public:
     }
 };
 
-struct VariableSet;
-
 template <typename T, typename = void>
 struct read
 {
@@ -494,8 +497,10 @@ struct rw_class_traits_helper
     static VariableSet & variableSetRef();
 };
 
+template <typename T, typename = void>
+struct rw_class_traits_helper_has_read_with_VariableSet_helper;
 template <typename T>
-class rw_class_traits_helper_has_read_with_VariableSet_helper
+class rw_class_traits_helper_has_read_with_VariableSet_helper<T, typename std::enable_if<std::is_class<T>::value>::type>
 {
 private:
     struct yes
@@ -509,6 +514,12 @@ private:
     static no f(...);
 public:
     static constexpr bool value = std::is_same<yes, decltype(f((const T *)nullptr))>::value;
+};
+
+template <typename T>
+struct rw_class_traits_helper_has_read_with_VariableSet_helper<T, typename std::enable_if<!std::is_class<T>::value>::type>
+{
+    static constexpr bool value = false;
 };
 
 template <typename T, bool = rw_class_traits_helper_has_read_with_VariableSet_helper<T>::value>
@@ -528,8 +539,10 @@ struct rw_class_traits_helper_has_read_with_VariableSet<T, true>
     typedef decltype(T::read(rw_class_traits_helper::readerRef(), rw_class_traits_helper::variableSetRef())) value_type;
 };
 
+template <typename T, typename = void>
+struct rw_class_traits_helper_has_read_without_VariableSet_helper;
 template <typename T>
-class rw_class_traits_helper_has_read_without_VariableSet_helper
+class rw_class_traits_helper_has_read_without_VariableSet_helper<T, typename std::enable_if<std::is_class<T>::value>::type>
 {
 private:
     struct yes
@@ -543,6 +556,12 @@ private:
     static no f(...);
 public:
     static constexpr bool value = std::is_same<yes, decltype(f((const T *)nullptr))>::value;
+};
+
+template <typename T>
+struct rw_class_traits_helper_has_read_without_VariableSet_helper<T, typename std::enable_if<!std::is_class<T>::value>::type>
+{
+    static constexpr bool value = false;
 };
 
 template <typename T, bool = rw_class_traits_helper_has_read_without_VariableSet_helper<T>::value>
@@ -577,30 +596,30 @@ struct rw_class_traits
     static_assert(!has_pod || !has_cached, "can't define both T::read(Reader &) and T::read(Reader &, VariableSet &)");
 };
 
-template <typename T, typename VariableSetT = VariableSet>
+template <typename T>
 struct read<T, typename std::enable_if<std::is_class<T>::value && (rw_class_traits<T>::has_pod || rw_class_traits<T>::has_cached)>::type> : public read_base<typename rw_class_traits<T>::value_type>
 {
-    template <typename = std::enable_if<rw_class_traits<T>::has_pod>::type>
+    template <typename = typename std::enable_if<rw_class_traits<T>::has_pod>::type>
     read(Reader &reader)
         : read_base<typename rw_class_traits<T>::value_type>(T::read(reader))
     {
     }
-    template <typename = std::enable_if<rw_class_traits<T>::has_cached>::type>
-    read(Reader &reader, VariableSetT &variableSet)
+    template <typename = typename std::enable_if<rw_class_traits<T>::has_cached>::type>
+    read(Reader &reader, VariableSet &variableSet)
         : read_base<typename rw_class_traits<T>::value_type>(rw_cached_helper<T>::read(reader, variableSet))
     {
     }
-}
+};
 
 template <typename T>
 struct write<T, typename std::enable_if<std::is_class<T>::value && (rw_class_traits<T>::has_pod || rw_class_traits<T>::has_cached)>::type>
 {
-    template <typename = std::enable_if<rw_class_traits<T>::has_pod>::type>
+    template <typename = typename std::enable_if<rw_class_traits<T>::has_pod>::type>
     write(Writer &writer, typename rw_class_traits<T>::value_type value)
     {
         value.write(writer);
     }
-    template <typename = std::enable_if<rw_class_traits<T>::has_cached>::type>
+    template <typename = typename std::enable_if<rw_class_traits<T>::has_cached>::type>
     write(Writer &writer, VariableSet &variableSet, typename rw_class_traits<T>::value_type value)
     {
         rw_cached_helper<T>::write(writer, variableSet, value);
@@ -611,10 +630,10 @@ template <typename T, typename = void>
 struct read_finite;
 
 template <typename T>
-struct read_finite<T, typename std::enable_if<std::is_integral<T>::value>::type> : public ::read<T>
+struct read_finite<T, typename std::enable_if<std::is_integral<T>::value>::type> : public stream::read<T>
 {
     read_finite(Reader & reader)
-        : ::read<T>(reader)
+        : stream::read<T>(reader)
     {
     }
 };
@@ -622,7 +641,7 @@ struct read_finite<T, typename std::enable_if<std::is_integral<T>::value>::type>
 template <typename T>
 inline typename rw_class_traits<T>::value_type read_checked(Reader & reader, function<bool(typename rw_class_traits<T>::value_type)> checkFn)
 {
-    typename rw_class_traits<T>::value_type retval = ::read<T>(reader);
+    typename rw_class_traits<T>::value_type retval = stream::read<T>(reader);
     if(!checkFn(retval))
     {
         throw InvalidDataValueException("check failed in read_checked");
@@ -643,9 +662,9 @@ struct read<typeName, void> : public read_base<typeName> \
     } \
 }; \
 template <> \
-struct read_limited<typeName, void> : public read_base<typeName> \
+struct read_limited<typeName> : public read_base<typeName> \
 { \
-    read(Reader & reader, typeName minV, typeName maxV) \
+    read_limited(Reader & reader, typeName minV, typeName maxV) \
         : read_base<typeName>(reader.readLimited ## functionSuffix(minV, maxV)) \
     { \
     } \
@@ -669,9 +688,9 @@ struct read<typeName, void> : public read_base<typeName> \
     } \
 }; \
 template <> \
-struct read_limited<typeName, void> : public read_base<typeName> \
+struct read_limited<typeName> : public read_base<typeName> \
 { \
-    read(Reader & reader, typeName minV, typeName maxV) \
+    read_limited(Reader & reader, typeName minV, typeName maxV) \
         : read_base<typeName>(reader.readLimited ## functionSuffix(minV, maxV)) \
     { \
     } \
@@ -732,7 +751,7 @@ template <typename T>
 struct read<T, typename std::enable_if<std::is_enum<T>::value>::type> : public read_base<T>
 {
     read(Reader &reader)
-        : read_base<T>((T)::read_limited<typename enum_traits<T>::rwtype>(reader, enum_traits<T>::minimum, enum_traits<T>::maximum))
+        : read_base<T>((T)stream::read_limited<typename enum_traits<T>::rwtype>(reader, enum_traits<T>::minimum, enum_traits<T>::maximum))
     {
     }
 };
@@ -742,7 +761,7 @@ struct write<T, typename std::enable_if<std::is_enum<T>::value>::type>
 {
     write(Writer &writer, T value)
     {
-        ::write<typename enum_traits<T>::rwtype>(writer, (typename enum_traits<T>::rwtype)value);
+        stream::write<typename enum_traits<T>::rwtype>(writer, (typename enum_traits<T>::rwtype)value);
     }
 };
 
@@ -985,5 +1004,7 @@ public:
         return retval;
     }
 };
+
+}
 
 #endif // STREAM_H

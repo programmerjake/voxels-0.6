@@ -146,19 +146,19 @@ public:
         return os << "<" << v.x << ", " << v.y << ", " << v.z << ">";
     }
 
-    static VectorI read(Reader &reader)
+    static VectorI read(stream::Reader &reader)
     {
-        int32_t x = ::read<int32_t>(reader);
-        int32_t y = ::read<int32_t>(reader);
-        int32_t z = ::read<int32_t>(reader);
+        int32_t x = stream::read<int32_t>(reader);
+        int32_t y = stream::read<int32_t>(reader);
+        int32_t z = stream::read<int32_t>(reader);
         return VectorI(x, y, z);
     }
 
-    void write(Writer &writer) const
+    void write(stream::Writer &writer) const
     {
-        ::write<int32_t>(writer, x);
-        ::write<int32_t>(writer, y);
-        ::write<int32_t>(writer, z);
+        stream::write<int32_t>(writer, x);
+        stream::write<int32_t>(writer, y);
+        stream::write<int32_t>(writer, z);
     }
 };
 
@@ -418,19 +418,19 @@ public:
         return os << "<" << v.x << ", " << v.y << ", " << v.z << ">";
     }
 
-    static VectorF read(Reader &reader)
+    static VectorF read(stream::Reader &reader)
     {
-        float x = ::read_finite<float32_t>(reader);
-        float y = ::read_finite<float32_t>(reader);
-        float z = ::read_finite<float32_t>(reader);
+        float x = stream::read_finite<float32_t>(reader);
+        float y = stream::read_finite<float32_t>(reader);
+        float z = stream::read_finite<float32_t>(reader);
         return VectorF(x, y, z);
     }
 
-    void write(Writer &writer) const
+    void write(stream::Writer &writer) const
     {
-        ::write<float32_t>(writer, x);
-        ::write<float32_t>(writer, y);
-        ::write<float32_t>(writer, z);
+        stream::write<float32_t>(writer, x);
+        stream::write<float32_t>(writer, y);
+        stream::write<float32_t>(writer, z);
     }
 };
 

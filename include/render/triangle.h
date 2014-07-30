@@ -20,16 +20,16 @@ struct TextureCoord
         : u(0), v(0)
     {
     }
-    static TextureCoord read(Reader &reader)
+    static TextureCoord read(stream::Reader &reader)
     {
-        float u = ::read_finite<float32_t>(reader);
-        float v = ::read_finite<float32_t>(reader);
+        float u = stream::read_finite<float32_t>(reader);
+        float v = stream::read_finite<float32_t>(reader);
         return TextureCoord(u, v);
     }
-    void write(Writer &writer) const
+    void write(stream::Writer &writer) const
     {
-        ::write<float32_t>(writer, u);
-        ::write<float32_t>(writer, v);
+        stream::write<float32_t>(writer, u);
+        stream::write<float32_t>(writer, v);
     }
 };
 
