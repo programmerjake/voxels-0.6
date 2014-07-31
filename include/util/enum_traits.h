@@ -57,21 +57,25 @@ struct enum_iterator : public std::iterator<std::random_access_iterator_tag, T>
     }
     const enum_iterator & operator ++()
     {
-        value++;
+        value = (T)((ptrdiff_t)value + 1);
         return *this;
     }
     const enum_iterator & operator --()
     {
-        value--;
+        value = (T)((ptrdiff_t)value - 1);
         return *this;
     }
     enum_iterator operator ++(int)
     {
-        return enum_iterator(value++);
+        T retval = value;
+        value = (T)((ptrdiff_t)value + 1);
+        return enum_iterator(retval);
     }
     enum_iterator operator --(int)
     {
-        return enum_iterator(value--);
+        T retval = value;
+        value = (T)((ptrdiff_t)value - 1);
+        return enum_iterator(retval);
     }
     constexpr bool operator ==(enum_iterator b) const
     {

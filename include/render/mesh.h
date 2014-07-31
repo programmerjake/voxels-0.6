@@ -23,6 +23,7 @@
 #include "texture/image.h"
 #include "stream/stream.h"
 #include "util/variable_set.h"
+#include "render/render_layer.h"
 #include <vector>
 #include <cassert>
 #include <utility>
@@ -208,7 +209,7 @@ struct Mesh
     {
         uint32_t triangleCount = triangles.size();
         assert(triangleCount == triangles.size());
-        stream::write<uint32_t>(writer);
+        stream::write<uint32_t>(writer, triangleCount);
         for(Triangle tri : triangles)
         {
             stream::write<Triangle>(writer, tri);
@@ -342,6 +343,20 @@ public:
     Renderer & operator <<(disable_depth_buffer_t)
     {
         depthBufferEnabled = false;
+        return *this;
+    }
+    Renderer & operator <<(RenderLayer rl)
+    {
+        switch(rl)
+        {
+        case RenderLayer::Opaque:
+            depthBufferEnabled = true;
+            return *this;
+        case RenderLayer::Translucent:
+            depthBufferEnabled = false;
+            return *this;
+        }
+        assert(false);
         return *this;
     }
 };

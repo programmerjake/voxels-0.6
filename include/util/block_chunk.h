@@ -19,11 +19,22 @@ struct BlockChunk
     static_assert(chunkSizeX > 0, "chunkSizeX must be positive");
     static_assert(chunkSizeY > 0, "chunkSizeY must be positive");
     static_assert(chunkSizeZ > 0, "chunkSizeZ must be positive");
+    static_assert((chunkSizeX & (chunkSizeX - 1)) == 0, "chunkSizeX must be a power of 2");
+    static_assert((chunkSizeY & (chunkSizeY - 1)) == 0, "chunkSizeY must be a power of 2");
+    static_assert((chunkSizeZ & (chunkSizeZ - 1)) == 0, "chunkSizeZ must be a power of 2");
     static constexpr bool transmitCompressed = TransmitCompressedV;
     mutable ChangeTracker changeTracker;
     constexpr BlockChunk(PositionI basePosition)
         : basePosition(basePosition)
     {
+    }
+    static constexpr PositionI getChunkBasePosition(PositionI pos)
+    {
+        return PositionI(pos.x & ~(chunkSizeX - 1), pos.y & ~(chunkSizeY - 1), pos.z & ~(chunkSizeZ - 1), pos.d);
+    }
+    static constexpr PositionI getChunkRelativePosition(PositionI pos)
+    {
+        return PositionI(pos.x & (chunkSizeX - 1), pos.y & (chunkSizeY - 1), pos.z & (chunkSizeZ - 1), pos.d);
     }
     array<array<array<T, chunkSizeZ>, chunkSizeY>, chunkSizeX> blocks;
 private:
@@ -63,7 +74,7 @@ private:
         stream::read_limited<int32_t>(reader, chunkSizeX, chunkSizeX);
         stream::read_limited<int32_t>(reader, chunkSizeY, chunkSizeY);
         stream::read_limited<int32_t>(reader, chunkSizeZ, chunkSizeZ);
-        stream::read_checked<bool>(reader, [](bool v){return v == transmitCompressed});
+        stream::read_checked<bool>(reader, [](bool v){return v == transmitCompressed;});
     }
     static void writeTemplateParameters(stream::Writer &writer)
     {

@@ -35,7 +35,7 @@ struct PositionI : public VectorI
         : d(Dimension::Overworld)
     {
     }
-    PositionI(int x, int y, int z, Dimension d)
+    PositionI(int32_t x, int32_t y, int32_t z, Dimension d)
         : VectorI(x, y, z), d(d)
     {
     }
@@ -95,11 +95,11 @@ struct PositionI : public VectorI
     {
         return PositionI(a * (VectorI)b, b.d);
     }
-    friend PositionI operator *(PositionI a, int b)
+    friend PositionI operator *(PositionI a, int32_t b)
     {
         return PositionI((VectorI)a * b, a.d);
     }
-    friend PositionI operator *(int a, PositionI b)
+    friend PositionI operator *(int32_t a, PositionI b)
     {
         return PositionI(a * (VectorI)b, b.d);
     }
@@ -122,7 +122,7 @@ struct PositionI : public VectorI
         *(VectorI *)this *= rt;
         return *this;
     }
-    const PositionI & operator *=(int rt)
+    const PositionI & operator *=(int32_t rt)
     {
         *(VectorI *)this *= rt;
         return *this;

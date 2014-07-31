@@ -31,19 +31,19 @@ private:
         Node *list_prev;
         const size_t cachedHash;
         Node(const key_type &key, const mapped_type &value, size_t cachedHash)
-            : value(key, value)
+            : value(key, value), cachedHash(cachedHash)
         {
         }
         Node(const key_type &key, size_t cachedHash)
-            : value(key, mapped_type())
+            : value(key, mapped_type()), cachedHash(cachedHash)
         {
         }
         Node(const value_type &kv_pair, size_t cachedHash)
-            : value(kv_pair)
+            : value(kv_pair), cachedHash(cachedHash)
         {
         }
         Node(const key_type &key, mapped_type &&value, size_t cachedHash)
-            : value(key, std::move(value))
+            : value(key, std::move(value)), cachedHash(cachedHash)
         {
         }
     };
@@ -145,9 +145,9 @@ private:
     {
         friend class linked_map;
     protected:
-        ValueT * pointer;
+        Node * pointer;
         const linked_map * container;
-        constexpr iterator_base(ValueT * pointer, const linked_map * container)
+        constexpr iterator_base(Node * pointer, const linked_map * container)
             : pointer(pointer), container(container)
         {
         }
@@ -168,11 +168,11 @@ private:
         }
         constexpr ValueT * operator ->() const
         {
-            return pointer;
+            return &pointer->value;
         }
         constexpr ValueT & operator *() const
         {
-            return *pointer;
+            return pointer->value;
         }
         const iterator_base & operator ++()
         {
@@ -210,7 +210,7 @@ private:
         }
     };
 public:
-    struct iterator final : public iterator_base<Node>
+    struct iterator final : public iterator_base<value_type>
     {
         friend class linked_map;
         constexpr iterator()
@@ -218,11 +218,11 @@ public:
         }
     private:
         constexpr iterator(Node * pointer, const linked_map * container)
-            : iterator_base<Node>(pointer, container)
+            : iterator_base<value_type>(pointer, container)
         {
         }
     };
-    struct const_iterator final : public iterator_base<const Node>
+    struct const_iterator final : public iterator_base<const value_type>
     {
         friend class linked_map;
         constexpr const_iterator()
@@ -234,7 +234,7 @@ public:
         }
     private:
         constexpr const_iterator(Node * pointer, const linked_map * container)
-            : iterator_base<const Node>(pointer, container)
+            : iterator_base<const value_type>(pointer, container)
         {
         }
     };

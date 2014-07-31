@@ -65,14 +65,7 @@ public:
     {
         return ConvertWithUInt32(r, g, b, a).v;
     }
-    static ColorI read(stream::Reader &reader)
-    {
-        uint8_t b = stream::read<uint8_t>(reader);
-        uint8_t g = stream::read<uint8_t>(reader);
-        uint8_t r = stream::read<uint8_t>(reader);
-        uint8_t a = stream::read<uint8_t>(reader);
-        return RGBAI(r, g, b, a);
-    }
+    static ColorI read(stream::Reader &reader);
     void write(stream::Writer &writer) const
     {
         stream::write<uint8_t>(writer, b);
@@ -85,6 +78,15 @@ public:
 constexpr ColorI RGBAI(int r, int g, int b, int a)
 {
     return ColorI((uint8_t)limit<int>(r, 0, 0xFF), (uint8_t)limit<int>(g, 0, 0xFF), (uint8_t)limit<int>(b, 0, 0xFF), (uint8_t)limit<int>(a, 0, 0xFF));
+}
+
+inline ColorI ColorI::read(stream::Reader &reader)
+{
+    uint8_t b = stream::read<uint8_t>(reader);
+    uint8_t g = stream::read<uint8_t>(reader);
+    uint8_t r = stream::read<uint8_t>(reader);
+    uint8_t a = stream::read<uint8_t>(reader);
+    return RGBAI(r, g, b, a);
 }
 
 constexpr ColorI RGBI(int r, int g, int b)

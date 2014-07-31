@@ -19,21 +19,72 @@
 #warning finish main.cpp
 #include "platform/audio.h"
 #include "platform/platform.h"
-#include "render/text.h"
+#include "render/render_object.h"
+#include "texture/texture_atlas.h"
+#include "render/generate.h"
+#include <iostream>
 using namespace std;
+
+shared_ptr<RenderObjectBlockDescriptor> makeBlockDescriptor(RenderLayer renderLayer, BlockDrawClass blockDrawClass, bool isSolid, TextureDescriptor nx, TextureDescriptor px, TextureDescriptor ny, TextureDescriptor py, TextureDescriptor nz, TextureDescriptor pz)
+{
+    shared_ptr<RenderObjectBlockDescriptor> retval = make_shared<RenderObjectBlockDescriptor>();
+    retval->center = make_shared<Mesh>();
+    retval->faceMesh[BlockFace::NX] = make_shared<Mesh>(Generate::unitBox(nx, TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()));
+    retval->faceMesh[BlockFace::PX] = make_shared<Mesh>(Generate::unitBox(TextureDescriptor(), px, TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()));
+    retval->faceMesh[BlockFace::NY] = make_shared<Mesh>(Generate::unitBox(TextureDescriptor(), TextureDescriptor(), ny, TextureDescriptor(), TextureDescriptor(), TextureDescriptor()));
+    retval->faceMesh[BlockFace::PY] = make_shared<Mesh>(Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), py, TextureDescriptor(), TextureDescriptor()));
+    retval->faceMesh[BlockFace::NZ] = make_shared<Mesh>(Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), nz, TextureDescriptor()));
+    retval->faceMesh[BlockFace::PZ] = make_shared<Mesh>(Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), pz));
+    for(BlockFace face : enum_traits<BlockFace>())
+    {
+        retval->faceBlocked[face] = isSolid;
+    }
+    retval->blockDrawClass = blockDrawClass;
+    retval->renderLayer = renderLayer;
+    return retval;
+}
 
 int main()
 {
     Audio audio(L"background13.ogg", true);
+    RenderObjectWorld world;
+    shared_ptr<RenderObjectBlockDescriptor> airDescriptor = makeBlockDescriptor(RenderLayer::Opaque, 0, false, TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor());
+    shared_ptr<RenderObjectBlockDescriptor> glassDescriptor = makeBlockDescriptor(RenderLayer::Opaque, 1, false, TextureAtlas::Glass.td(), TextureAtlas::Glass.td(), TextureAtlas::Glass.td(), TextureAtlas::Glass.td(), TextureAtlas::Glass.td(), TextureAtlas::Glass.td());
+    for(int32_t x = -30; x < 30; x++)
+    {
+        for(int32_t y = -30; y < 30; y++)
+        {
+            for(int32_t z = -30; z < 30; z++)
+            {
+                world.setBlock(PositionI(x, y + 100, z, Dimension::Overworld), RenderObjectBlock(airDescriptor));
+                if(x * x + y * y + z * z > 25)
+                    world.setBlock(PositionI(x, y + 100, z, Dimension::Overworld), RenderObjectBlock(glassDescriptor));
+            }
+        }
+    }
+    PositionF position = PositionF(0.5, 100.5, 0.5, Dimension::Overworld);
+    Mesh drawMesh;
+    for(RenderLayer renderLayer : enum_traits<RenderLayer>())
+    {
+        drawMesh.clear();
+        world.draw(drawMesh, renderLayer, (PositionI)position, 32);
+    }
+
     startGraphics();
     shared_ptr<PlayingAudio> playingAudio = audio.play(0.5f, true);
     Renderer r;
     while(true)
     {
         Display::clear();
-        Mesh mesh = Text::mesh(L"This is a test.", RGBF(1, 0, 1));
-        mesh.append(reverse(mesh));
-        r << transform((Matrix::rotateY(-Display::timer())).concat(Matrix::translate(0, 0, -30)), mesh);
+        Matrix tform = Matrix::rotateY(Display::timer()).concat(Matrix::translate((VectorF)position));
+        for(RenderLayer renderLayer : enum_traits<RenderLayer>())
+        {
+            r << renderLayer;
+            drawMesh.clear();
+            world.draw(drawMesh, renderLayer, (PositionI)position, 32);
+            drawMesh = transform(inverse(tform), drawMesh);
+            r << drawMesh;
+        }
         Display::flip(60);
         Display::handleEvents(nullptr);
     }

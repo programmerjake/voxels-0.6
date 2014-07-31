@@ -20,26 +20,15 @@
 
 #include <cstdint>
 #include "stream/stream.h"
+#include "util/enum_traits.h"
 
 using namespace std;
 
-enum class RenderLayer : uint_fast8_t
+enum class RenderLayer : uint8_t
 {
     Opaque,
     Translucent,
-    Last
+    DEFINE_ENUM_LIMITS(Opaque, Translucent)
 };
-
-inline void writeRenderLayer(RenderLayer rl, Writer &writer)
-{
-    writer.writeU8((uint8_t)rl);
-}
-
-inline RenderLayer readRenderLayer(Reader &reader)
-{
-    return (RenderLayer)reader.readLimitedU8(0, (uint8_t)RenderLayer::Last);
-}
-
-void renderLayerSetup(RenderLayer rl); // in world.cpp
 
 #endif // RENDER_LAYER_H_INCLUDED

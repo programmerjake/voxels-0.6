@@ -33,7 +33,7 @@ struct VectorF;
 struct VectorI
 {
     int32_t x, y, z;
-    constexpr VectorI(int x, int y, int z)
+    constexpr VectorI(int32_t x, int32_t y, int32_t z)
         : x(x), y(y), z(z)
     {
     }
@@ -42,7 +42,7 @@ private:
     VectorI(float x, float y, float z) = delete;
 public:
 
-    constexpr VectorI(int v = 0)
+    constexpr VectorI(int32_t v = 0)
         : x(v), y(v), z(v)
     {
     }
@@ -72,12 +72,12 @@ public:
         return VectorI(x * r.x, y * r.y, z * r.z);
     }
 
-    constexpr const VectorI operator *(int r) const
+    constexpr const VectorI operator *(int32_t r) const
     {
         return VectorI(x * r, y * r, z * r);
     }
 
-    friend constexpr  VectorI operator *(int a, const VectorI & b)
+    friend constexpr VectorI operator *(int32_t a, const VectorI & b)
     {
         return VectorI(a * b.x, a * b.y, a * b.z);
     }
@@ -113,7 +113,7 @@ public:
         z *= r.z;
         return *this;
     }
-    const VectorI & operator *=(int r)
+    const VectorI & operator *=(int32_t r)
     {
         x *= r;
         y *= r;
