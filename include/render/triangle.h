@@ -83,6 +83,38 @@ struct Triangle
         : t1(0, 0), t2(0, 0), t3(0, 0), p1(0), p2(0), p3(0), c1(colorizeIdentity()), c2(colorizeIdentity()), c3(colorizeIdentity()), n1(0), n2(0), n3(0)
     {
     }
+    static Triangle read(stream::Reader &reader)
+    {
+        Triangle retval;
+        retval.p1 = stream::read<VectorF>(reader);
+        retval.c1 = stream::read<ColorF>(reader);
+        retval.t1 = stream::read<TextureCoord>(reader);
+        retval.n1 = stream::read<VectorF>(reader);
+        retval.p2 = stream::read<VectorF>(reader);
+        retval.c2 = stream::read<ColorF>(reader);
+        retval.t2 = stream::read<TextureCoord>(reader);
+        retval.n2 = stream::read<VectorF>(reader);
+        retval.p3 = stream::read<VectorF>(reader);
+        retval.c3 = stream::read<ColorF>(reader);
+        retval.t3 = stream::read<TextureCoord>(reader);
+        retval.n3 = stream::read<VectorF>(reader);
+        return retval;
+    }
+    void write(stream::Writer &writer) const
+    {
+        stream::write<VectorF>(writer, p1);
+        stream::write<ColorF>(writer, c1);
+        stream::write<TextureCoord>(writer, t1);
+        stream::write<VectorF>(writer, n1);
+        stream::write<VectorF>(writer, p2);
+        stream::write<ColorF>(writer, c2);
+        stream::write<TextureCoord>(writer, t2);
+        stream::write<VectorF>(writer, n2);
+        stream::write<VectorF>(writer, p3);
+        stream::write<ColorF>(writer, c3);
+        stream::write<TextureCoord>(writer, t3);
+        stream::write<VectorF>(writer, n3);
+    }
 };
 
 inline Triangle transform(const Matrix & m, const Triangle & t)

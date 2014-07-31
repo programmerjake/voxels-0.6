@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <ostream>
 #include "util/util.h"
+#include "stream/stream.h"
 
 using namespace std;
 
@@ -63,6 +64,21 @@ public:
     explicit constexpr operator uint32_t() const
     {
         return ConvertWithUInt32(r, g, b, a).v;
+    }
+    static ColorI read(stream::Reader &reader)
+    {
+        uint8_t b = stream::read<uint8_t>(reader);
+        uint8_t g = stream::read<uint8_t>(reader);
+        uint8_t r = stream::read<uint8_t>(reader);
+        uint8_t a = stream::read<uint8_t>(reader);
+        return RGBAI(r, g, b, a);
+    }
+    void write(stream::Writer &writer) const
+    {
+        stream::write<uint8_t>(writer, b);
+        stream::write<uint8_t>(writer, g);
+        stream::write<uint8_t>(writer, r);
+        stream::write<uint8_t>(writer, a);
     }
 };
 
@@ -116,6 +132,14 @@ public:
     friend ostream & operator <<(ostream & os, const ColorF & c)
     {
         return os << "RGBA(" << c.r << ", " << c.g << ", " << c.b << ", " << c.a << ")";
+    }
+    static ColorF read(stream::Reader &reader)
+    {
+        return (ColorF)(ColorI)stream::read<ColorI>(reader);
+    }
+    void write(stream::Writer &writer) const
+    {
+        stream::write<ColorI>(writer, (ColorI)*this);
     }
 };
 

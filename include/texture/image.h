@@ -116,18 +116,14 @@ private:
 namespace stream
 {
 template <>
-struct read<Image> : public read_base<Image>
+struct rw_cached_helper<Image>
 {
-    read(Reader &reader, VariableSet &variableSet)
-        : read_base<Image>(Image::read(reader, variableSet))
+    typedef Image value_type;
+    static value_type read(Reader &reader, VariableSet &variableSet)
     {
+        return Image::read(reader, variableSet);
     }
-};
-
-template <>
-struct write<Image>
-{
-    write(Writer &writer, VariableSet &variableSet, Image value)
+    static void write(Writer &writer, VariableSet &variableSet, value_type value)
     {
         value.write(writer, variableSet);
     }

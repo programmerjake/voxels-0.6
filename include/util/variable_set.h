@@ -61,11 +61,11 @@ public:
         }
         bool operator !() const
         {
-            return descriptorIndex != 0;
+            return descriptorIndex == 0;
         }
         operator bool() const
         {
-            return descriptorIndex == 0;
+            return descriptorIndex != 0;
         }
         static Descriptor read(stream::Reader & reader)
         {
@@ -149,15 +149,15 @@ public:
         if(!descriptor)
             return nullptr;
         shared_ptr<T> retval = get(descriptor);
-        bool modified = stream::read<bool>(reader);
-        if(retval != nullptr && !modified)
+        bool changed = stream::read<bool>(reader);
+        if(retval != nullptr && !changed)
             return retval;
         retval = T::read(reader, *this);
         set(descriptor, retval);
         return retval;
     }
     template <typename T>
-    void write_helper(stream::Writer &writer, shared_ptr<T> value, bool modified)
+    void write_helper(stream::Writer &writer, shared_ptr<T> value, bool changed)
     {
         if(value == nullptr)
         {
@@ -166,8 +166,8 @@ public:
         }
         pair<Descriptor<T>, bool> findOrMakeReturnValue = findOrMake<T>(value);
         stream::write<Descriptor<T>>(writer, std::get<0>(findOrMakeReturnValue));
-        stream::write<bool>(writer, modified || !std::get<1>(findOrMakeReturnValue));
-        if(std::get<1>(findOrMakeReturnValue) && !modified)
+        stream::write<bool>(writer, changed || !std::get<1>(findOrMakeReturnValue));
+        if(std::get<1>(findOrMakeReturnValue) && !changed)
         {
             return;
         }
@@ -175,7 +175,46 @@ public:
     }
 };
 
-#warning write modification tracker
+class ChangeTracker
+{
+    typedef uint_fast32_t ChangeCountType;
+    std::atomic<ChangeCountType> currentChangeCount;
+    std::atomic_bool changedFlag;
+    struct ChangeCountWrapper
+    {
+        ChangeCountType changeCount = 0;
+    };
+    VariableSet::Descriptor<ChangeCountWrapper> changeCountDescriptor;
+public:
+    ChangeTracker()
+        : currentChangeCount(0), changedFlag(false), changeCountDescriptor()
+    {
+    }
+    void onChange()
+    {
+        changedFlag = true;
+    }
+    bool getChanged(VariableSet &variableSet)
+    {
+        if(changedFlag.exchange(false))
+        {
+            currentChangeCount++;
+            return true;
+        }
+        shared_ptr<ChangeCountWrapper> pChangeCount = variableSet.get(changeCountDescriptor);
+        if(pChangeCount == nullptr)
+            return true;
+        if(pChangeCount->changeCount < currentChangeCount)
+            return true;
+        return false;
+    }
+    void onWrite(VariableSet &variableSet)
+    {
+        shared_ptr<ChangeCountWrapper> pChangeCount = shared_ptr<ChangeCountWrapper>(new ChangeCountWrapper);
+        pChangeCount->changeCount = currentChangeCount;
+        variableSet.set(changeCountDescriptor, pChangeCount);
+    }
+};
 
 namespace stream
 {
@@ -189,7 +228,7 @@ struct rw_cached_helper<T, typename std::enable_if<rw_class_traits_helper_has_re
     }
     static void write(Writer &writer, VariableSet &variableSet, value_type value)
     {
-        return variableSet.write_helper<T>(writer, value, is_value_modified<T>()(value, variableSet));
+        return variableSet.write_helper<T>(writer, value, is_value_changed<T>()(value, variableSet));
     }
 };
 }

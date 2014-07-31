@@ -192,6 +192,29 @@ struct Mesh
         triangles.clear();
         image = nullptr;
     }
+    static shared_ptr<Mesh> read(stream::Reader &reader, VariableSet &variableSet)
+    {
+        uint32_t triangleCount = stream::read<uint32_t>(reader);
+        vector<Triangle> triangles;
+        triangles.reserve(triangleCount);
+        for(uint32_t i = 0; i < triangleCount; i++)
+        {
+            triangles.push_back((Triangle)stream::read<Triangle>(reader));
+        }
+        Image image = stream::read<Image>(reader, variableSet);
+        return make_shared<Mesh>(triangles, image);
+    }
+    void write(stream::Writer &writer, VariableSet &variableSet) const
+    {
+        uint32_t triangleCount = triangles.size();
+        assert(triangleCount == triangles.size());
+        stream::write<uint32_t>(writer);
+        for(Triangle tri : triangles)
+        {
+            stream::write<Triangle>(writer, tri);
+        }
+        stream::write<Image>(writer, variableSet, image);
+    }
 };
 
 inline TransformedMesh::operator Mesh() const

@@ -20,7 +20,7 @@ struct BlockChunk
     static_assert(chunkSizeY > 0, "chunkSizeY must be positive");
     static_assert(chunkSizeZ > 0, "chunkSizeZ must be positive");
     static constexpr bool transmitCompressed = TransmitCompressedV;
-    bool modified = false;
+    mutable ChangeTracker changeTracker;
     constexpr BlockChunk(PositionI basePosition)
         : basePosition(basePosition)
     {
@@ -52,6 +52,7 @@ private:
                 }
             }
         }
+        changeTracker.onWrite(variableSet);
     }
     static bool checkPosition(PositionI p)
     {
@@ -99,23 +100,22 @@ public:
         else
             writeInternal(writer, variableSet);
     }
-    void onModify() // call whenever this is modified : implementation may change
+    void onChange()
     {
-        modified = true;
+        changeTracker.onChange();
     }
 };
 
 namespace stream
 {
 template <typename T, size_t ChunkSizeXV, size_t ChunkSizeYV, size_t ChunkSizeZV, bool TransmitCompressedV>
-struct is_value_modified<BlockChunk<T, ChunkSizeXV, ChunkSizeYV, ChunkSizeZV, TransmitCompressedV>>
+struct is_value_changed<BlockChunk<T, ChunkSizeXV, ChunkSizeYV, ChunkSizeZV, TransmitCompressedV>>
 {
     bool operator ()(std::shared_ptr<const BlockChunk<T, ChunkSizeXV, ChunkSizeYV, ChunkSizeZV, TransmitCompressedV>> value, VariableSet &variableSet) const
     {
         if(value == nullptr)
             return false;
-        return value->modified;
-#warning implement modification check for multiple VariableSet objects
+        return value->changeTracker.getChanged(variableSet);
     }
 };
 }

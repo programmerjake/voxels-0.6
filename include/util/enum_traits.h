@@ -129,4 +129,50 @@ struct enum_traits : public enum_traits_default<typename std::enable_if<std::is_
 enum_first = first, \
 enum_last = last,
 
+template <typename T, typename EnumT>
+struct enum_array
+{
+    typedef T value_type;
+    typedef EnumT index_type;
+    typedef value_type * iterator;
+    typedef const value_type * const_iterator;
+    value_type elements[enum_traits<index_type>::size()];
+    value_type & operator [](index_type index)
+    {
+        return elements[enum_iterator<index_type>(index) - enum_traits<index_type>::begin()];
+    }
+    const value_type & operator [](index_type index) const
+    {
+        return elements[enum_iterator<index_type>(index) - enum_traits<index_type>::begin()];
+    }
+    static constexpr size_t size()
+    {
+        return enum_traits<index_type>::size();
+    }
+    iterator begin()
+    {
+        return &elements[0];
+    }
+    iterator end()
+    {
+        return begin() + size();
+    }
+    const_iterator begin() const
+    {
+        return &elements[0];
+    }
+    const_iterator end() const
+    {
+        return begin() + size();
+    }
+    const_iterator cbegin() const
+    {
+        return &elements[0];
+    }
+    const_iterator cend() const
+    {
+        return begin() + size();
+    }
+};
+
 #endif // ENUM_TRAITS_H_INCLUDED

@@ -469,7 +469,7 @@ template <typename T, typename = void>
 struct read;
 
 template <typename T>
-struct is_value_modified
+struct is_value_changed
 {
     constexpr bool operator ()(std::shared_ptr<const T>, VariableSet &) const
     {
