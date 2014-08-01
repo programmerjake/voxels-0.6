@@ -14,6 +14,7 @@
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-g" />
+					<Add option="-Og" />
 					<Add option="-DDEBUG_VERSION" />
 				</Compiler>
 			</Target>
@@ -62,6 +63,7 @@
 		<Unit filename="include/render/mesh.h" />
 		<Unit filename="include/render/render_layer.h" />
 		<Unit filename="include/render/render_object.h" />
+		<Unit filename="include/render/renderer.h" />
 		<Unit filename="include/render/text.h" />
 		<Unit filename="include/render/triangle.h" />
 		<Unit filename="include/script/script.h" />

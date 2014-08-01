@@ -664,6 +664,7 @@ inline shared_ptr<Scripting::Data> Scripting::Data::read(stream::Reader &reader)
         return static_pointer_cast<Data>(DataString::read(reader));
     }
     assert(false);
+    return nullptr;
 }
 
 inline void runEntityPartScript(shared_ptr<Mesh> dest, shared_ptr<Mesh> partMesh, shared_ptr<Script> script, VectorF position, VectorF velocity, float age, shared_ptr<Scripting::DataObject> ioObject = make_shared<Scripting::DataObject>())

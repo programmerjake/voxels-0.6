@@ -2353,6 +2353,7 @@ shared_ptr<Scripting::Node> Scripting::Node::read(stream::Reader &reader, uint32
         return NodeFor::read(reader, nodeCount);
     }
     assert(false);
+    return nullptr;
 }
 
 

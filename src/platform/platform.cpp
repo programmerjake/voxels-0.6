@@ -1032,10 +1032,11 @@ VectorF Display::transformMouseTo3D(float x, float y, float depth)
     return VectorF(depth * scaleX() * (2 * x / width() - 1), depth * scaleY() * (1 - 2 * y / height()), -depth);
 }
 
-void Display::render(const Mesh & m, bool enableDepthBuffer)
+namespace
+{
+void renderInternal(const Mesh & m)
 {
     static vector<float> vertexArray, textureCoordArray, colorArray;
-    m.image.bind();
     vertexArray.resize(m.triangles.size() * 3 * 3);
     textureCoordArray.resize(m.triangles.size() * 3 * 2);
     colorArray.resize(m.triangles.size() * 3 * 4);
@@ -1073,8 +1074,15 @@ void Display::render(const Mesh & m, bool enableDepthBuffer)
     glVertexPointer(3, GL_FLOAT, 0, (const void *)&vertexArray[0]);
     glTexCoordPointer(2, GL_FLOAT, 0, (const void *)&textureCoordArray[0]);
     glColorPointer(4, GL_FLOAT, 0, (const void *)&colorArray[0]);
-    glDepthMask(enableDepthBuffer ? GL_TRUE : GL_FALSE);
     glDrawArrays(GL_TRIANGLES, 0, (GLint)m.triangles.size() * 3);
+}
+}
+
+void Display::render(const Mesh & m, bool enableDepthBuffer)
+{
+    m.image.bind();
+    glDepthMask(enableDepthBuffer ? GL_TRUE : GL_FALSE);
+    renderInternal(m);
 }
 
 void Display::clear(ColorF color)
@@ -1083,4 +1091,79 @@ void Display::clear(ColorF color)
     glClearColor(color.r, color.g, color.b, color.a);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     initFrame();
+}
+
+namespace
+{
+
+vector<GLuint> freeDisplayLists;
+mutex freeDisplayListsLock;
+GLuint allocateDisplayList()
+{
+    freeDisplayListsLock.lock();
+    if(freeDisplayLists.empty())
+    {
+        freeDisplayListsLock.unlock();
+        return glGenLists(1);
+    }
+    GLuint retval = freeDisplayLists.back();
+    freeDisplayLists.pop_back();
+    freeDisplayListsLock.unlock();
+    return retval;
+}
+void freeDisplayList(GLuint displayList)
+{
+    lock_guard<mutex> lockGuard(freeDisplayListsLock);
+    freeDisplayLists.push_back(displayList);
+}
+struct CachedMeshData
+{
+    GLuint displayList;
+    Image image;
+    CachedMeshData(const Mesh & mesh)
+        : displayList(allocateDisplayList()), image(mesh.image)
+    {
+        glNewList(displayList, GL_COMPILE);
+        renderInternal(mesh);
+        glEndList();
+    }
+    ~CachedMeshData()
+    {
+        freeDisplayList(displayList);
+    }
+    void render(Matrix tform, bool enableDepthBuffer)
+    {
+        image.bind();
+        glDepthMask(enableDepthBuffer ? GL_TRUE : GL_FALSE);
+        glMatrixMode(GL_MODELVIEW);
+        glLoadMatrix(tform);
+        glCallList(displayList);
+        glLoadIdentity();
+    }
+};
+}
+
+struct CachedMesh
+{
+    Matrix tform;
+    shared_ptr<CachedMeshData> data;
+    CachedMesh(Matrix tform, shared_ptr<CachedMeshData> data)
+        : tform(tform), data(data)
+    {
+    }
+};
+
+shared_ptr<CachedMesh> makeCachedMesh(const Mesh & mesh)
+{
+    return make_shared<CachedMesh>(Matrix::identity(), make_shared<CachedMeshData>(mesh));
+}
+
+shared_ptr<CachedMesh> transform(const Matrix & m, shared_ptr<CachedMesh> mesh)
+{
+    return make_shared<CachedMesh>(transform(m, mesh->tform), mesh->data);
+}
+
+void Display::render(shared_ptr<CachedMesh> m, bool enableDepthBuffer)
+{
+    m->data->render(m->tform, enableDepthBuffer);
 }

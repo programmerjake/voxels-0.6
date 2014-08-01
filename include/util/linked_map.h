@@ -192,7 +192,7 @@ private:
         }
         const iterator_base operator ++(int)
         {
-            ValueT * initial_pointer = pointer;
+            Node * initial_pointer = pointer;
             if(pointer == nullptr)
                 pointer = container->list_head;
             else
@@ -201,7 +201,7 @@ private:
         }
         const iterator_base operator --(int)
         {
-            ValueT * initial_pointer = pointer;
+            Node * initial_pointer = pointer;
             if(pointer == nullptr)
                 pointer = container->list_tail;
             else
@@ -283,8 +283,10 @@ public:
     }
     void clear()
     {
-        for(Node *deleteMe = list_head; list_head != nullptr; deleteMe = list_head, list_head = list_head->list_next)
+        while(list_head != nullptr)
         {
+            Node * deleteMe = list_head;
+            list_head = list_head->list_next;
             delete deleteMe;
         }
         node_count = 0;
@@ -405,11 +407,11 @@ public:
     {
         create_buckets();
         size_t current_hash = (size_t)the_hasher(key) % bucket_count_;
-        for(const Node *retval = buckets[current_hash];retval != nullptr;retval = retval->hash_next)
+        for(Node *retval = buckets[current_hash];retval != nullptr;retval = retval->hash_next)
         {
             if(the_comparer(std::get<0>(retval->value), key))
             {
-                return iterator(retval, this);
+                return const_iterator(retval, this);
             }
         }
         return end();

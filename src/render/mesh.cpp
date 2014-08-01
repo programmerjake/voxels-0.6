@@ -16,6 +16,7 @@
  *
  */
 #include "render/mesh.h"
+#include "render/renderer.h"
 #include "platform/platform.h"
 #include <iostream>
 

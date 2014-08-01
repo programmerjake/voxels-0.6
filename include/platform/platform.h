@@ -216,6 +216,11 @@ enum MouseButton
     MouseButton_X2 = 0x10
 };
 
+struct CachedMesh;
+
+shared_ptr<CachedMesh> makeCachedMesh(const Mesh & mesh);
+shared_ptr<CachedMesh> transform(const Matrix & m, shared_ptr<CachedMesh> mesh);
+
 namespace Display
 {
     wstring title();
@@ -237,6 +242,7 @@ namespace Display
     void grabMouse(bool g);
     VectorF transformMouseTo3D(float x, float y, float depth = 1.0f);
     void render(const Mesh & m, bool enableDepthBuffer);
+    void render(shared_ptr<CachedMesh> m, bool enableDepthBuffer);
     void clear(ColorF color = RGBAF(0, 0, 0, 0));
 }
 

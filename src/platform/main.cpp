@@ -23,6 +23,7 @@
 #include "texture/texture_atlas.h"
 #include "render/generate.h"
 #include <iostream>
+#include <thread>
 using namespace std;
 
 shared_ptr<RenderObjectBlockDescriptor> makeBlockDescriptor(RenderLayer renderLayer, BlockDrawClass blockDrawClass, bool isSolid, TextureDescriptor nx, TextureDescriptor px, TextureDescriptor ny, TextureDescriptor py, TextureDescriptor nz, TextureDescriptor pz)
@@ -44,49 +45,65 @@ shared_ptr<RenderObjectBlockDescriptor> makeBlockDescriptor(RenderLayer renderLa
     return retval;
 }
 
-int main()
+shared_ptr<RenderObjectWorld> makeWorld()
 {
-    Audio audio(L"background13.ogg", true);
-    RenderObjectWorld world;
+    shared_ptr<RenderObjectWorld> world = make_shared<RenderObjectWorld>();
     shared_ptr<RenderObjectBlockDescriptor> airDescriptor = makeBlockDescriptor(RenderLayer::Opaque, 0, false, TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor());
     shared_ptr<RenderObjectBlockDescriptor> glassDescriptor = makeBlockDescriptor(RenderLayer::Opaque, 1, false, TextureAtlas::Glass.td(), TextureAtlas::Glass.td(), TextureAtlas::Glass.td(), TextureAtlas::Glass.td(), TextureAtlas::Glass.td(), TextureAtlas::Glass.td());
-    for(int32_t x = -30; x < 30; x++)
+    shared_ptr<RenderObjectBlockDescriptor> oakWoodDescriptor = makeBlockDescriptor(RenderLayer::Opaque, 2, true, TextureAtlas::OakWood.td(), TextureAtlas::OakWood.td(), TextureAtlas::WoodEnd.td(), TextureAtlas::WoodEnd.td(), TextureAtlas::OakWood.td(), TextureAtlas::OakWood.td());
+    for(int32_t x = -100; x < 100; x++)
     {
-        for(int32_t y = -30; y < 30; y++)
+        for(int32_t y = -100; y < 256 - 100; y++)
         {
-            for(int32_t z = -30; z < 30; z++)
+            for(int32_t z = -100; z < 100; z++)
             {
-                world.setBlock(PositionI(x, y + 100, z, Dimension::Overworld), RenderObjectBlock(airDescriptor));
+                world->setBlock(PositionI(x, y + 100, z, Dimension::Overworld), RenderObjectBlock(airDescriptor));
                 if(x * x + y * y + z * z > 25)
-                    world.setBlock(PositionI(x, y + 100, z, Dimension::Overworld), RenderObjectBlock(glassDescriptor));
+                    world->setBlock(PositionI(x, y + 100, z, Dimension::Overworld), RenderObjectBlock(x * y * z <= 0 ? glassDescriptor : oakWoodDescriptor));
             }
         }
     }
-    PositionF position = PositionF(0.5, 100.5, 0.5, Dimension::Overworld);
-    Mesh drawMesh;
-    for(RenderLayer renderLayer : enum_traits<RenderLayer>())
-    {
-        drawMesh.clear();
-        world.draw(drawMesh, renderLayer, (PositionI)position, 32);
-    }
+    return world;
+}
 
+shared_ptr<stream::Reader> worldReader()
+{
+    stream::StreamPipe pipe;
+    thread([](shared_ptr<stream::Writer> pwriter)
+    {
+        stream::Writer &writer = *pwriter;
+        VariableSet variableSet;
+        stream::write<RenderObjectWorld>(writer, variableSet, makeWorld());
+    }, pipe.pwriter()).detach();
+    return pipe.preader();
+}
+
+int main()
+{
+    Audio audio(L"background13.ogg", true);
+    shared_ptr<RenderObjectWorld> world;
+    {
+        VariableSet variableSet;
+        world = stream::read<RenderObjectWorld>(*worldReader(), variableSet);
+    }
+    cout << "Read World" << endl;
+    PositionF position = PositionF(0.5, 100.5, 0.5, Dimension::Overworld);
     startGraphics();
     shared_ptr<PlayingAudio> playingAudio = audio.play(0.5f, true);
     Renderer r;
     while(true)
     {
         Display::clear();
-        Matrix tform = Matrix::rotateY(Display::timer()).concat(Matrix::translate((VectorF)position));
+        Matrix tform = Matrix::rotateY(Display::timer() / 5 * M_PI).concat(Matrix::translate((VectorF)position));
+        size_t triangleCount = 0;
         for(RenderLayer renderLayer : enum_traits<RenderLayer>())
         {
             r << renderLayer;
-            drawMesh.clear();
-            world.draw(drawMesh, renderLayer, (PositionI)position, 32);
-            drawMesh = transform(inverse(tform), drawMesh);
-            r << drawMesh;
+            world->draw(r, inverse(tform), renderLayer, (PositionI)position, 32);
         }
         Display::flip(60);
         Display::handleEvents(nullptr);
+        cout << "FPS: " << Display::averageFPS() << "\x1b[K\r";
     }
 }
 #else

@@ -577,13 +577,23 @@ struct rw_cached_helper
     typedef void value_type;
 };
 
+template <typename T, typename = void>
+struct rw_class_traits;
 template <typename T>
-struct rw_class_traits
+struct rw_class_traits<T, typename std::enable_if<std::is_class<T>::value>::type>
 {
     static constexpr bool has_pod = rw_class_traits_helper_has_read_without_VariableSet<T>::value;
     static constexpr bool has_cached = !std::is_same<typename rw_cached_helper<T>::value_type, void>::value;
     typedef typename std::conditional<rw_class_traits_helper_has_read_without_VariableSet<T>::value, typename rw_class_traits_helper_has_read_without_VariableSet<T>::value_type, typename rw_cached_helper<T>::value_type>::type value_type;
     static_assert(!has_pod || !has_cached, "can't define both T::read(Reader &) and T::read(Reader &, VariableSet &)");
+};
+
+template <typename T>
+struct rw_class_traits<T, typename std::enable_if<std::is_enum<T>::value || std::is_arithmetic<T>::value>::type>
+{
+    static constexpr bool has_pod = true;
+    static constexpr bool has_cached = false;
+    typedef T value_type;
 };
 
 template <typename T>
