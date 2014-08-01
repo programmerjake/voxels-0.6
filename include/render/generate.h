@@ -21,6 +21,7 @@
 #include "render/mesh.h"
 #include "texture/texture_descriptor.h"
 #include <utility>
+#include <functional>
 
 using namespace std;
 
@@ -32,7 +33,12 @@ inline Mesh reverse(const Mesh &mesh)
         swap(tri.p1, tri.p2);
         swap(tri.c1, tri.c2);
         swap(tri.t1, tri.t2);
-        swap(tri.n1, tri.n2);
+        VectorF n1 = -tri.n2;
+        VectorF n2 = -tri.n1;
+        VectorF n3 = -tri.n3;
+        tri.n1 = n1;
+        tri.n2 = n2;
+        tri.n3 = n3;
     }
     return Mesh(std::move(triangles), mesh.image);
 }
@@ -60,6 +66,17 @@ inline ColorizedMesh reverse(ColorizedMesh mesh)
 {
     mesh.mesh = reverse(mesh.mesh);
     return mesh;
+}
+
+inline Mesh lightMesh(Mesh m, function<ColorF(ColorF color, VectorF position, VectorF normal)> lightVertex)
+{
+    for(Triangle & tri : m.triangles)
+    {
+        tri.c1 = lightVertex(tri.c1, tri.p1, tri.n1);
+        tri.c2 = lightVertex(tri.c2, tri.p2, tri.n2);
+        tri.c3 = lightVertex(tri.c3, tri.p3, tri.n3);
+    }
+    return m;
 }
 
 namespace Generate

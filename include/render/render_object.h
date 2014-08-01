@@ -8,6 +8,9 @@
 #include "util/block_chunk.h"
 #include "util/enum_traits.h"
 #include "util/linked_map.h"
+#include <functional>
+
+using namespace std;
 
 enum class BlockFace : uint8_t
 {
@@ -243,7 +246,7 @@ class RenderObjectWorld
         return std::get<1>(*iter);
     }
 public:
-    void draw(Renderer & renderer, Matrix tform, RenderLayer renderLayer, PositionI pos, int32_t viewDistance)
+    void draw(Renderer & renderer, Matrix tform, RenderLayer renderLayer, PositionI pos, int32_t viewDistance, function<Mesh(Mesh mesh, PositionI chunkBasePosition)> filterFn, bool needFilterUpdate)
     {
         assert(viewDistance > 0);
         PositionI minPosition = pos - VectorI(viewDistance);
@@ -267,9 +270,9 @@ public:
                     if(chunk != nullptr)
                     {
                         bool isNewMesh;
-                        const Mesh & mesh = chunk->getDrawMesh(renderLayer, getChunk(nxPos), getChunk(pxPos), getChunk(nyPos), getChunk(pyPos), getChunk(nzPos), getChunk(pzPos), &isNewMesh);
-                        if(isNewMesh || !chunk->cachedMesh[renderLayer])
-                            chunk->cachedMesh[renderLayer] = renderer.cacheMesh(mesh);
+                        const Mesh &mesh = chunk->getDrawMesh(renderLayer, getChunk(nxPos), getChunk(pxPos), getChunk(nyPos), getChunk(pyPos), getChunk(nzPos), getChunk(pzPos), &isNewMesh);
+                        if(isNewMesh || !chunk->cachedMesh[renderLayer] || needFilterUpdate)
+                            chunk->cachedMesh[renderLayer] = renderer.cacheMesh(filterFn(mesh, blockPosition));
                         renderer << transform(tform, chunk->cachedMesh[renderLayer]);
                     }
                 }

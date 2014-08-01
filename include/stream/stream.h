@@ -30,6 +30,7 @@
 #include <functional>
 #include <type_traits>
 #include <cassert>
+#include <vector>
 #include "util/string_cast.h"
 #include "util/enum_traits.h"
 #ifdef DEBUG_STREAM
@@ -881,12 +882,28 @@ public:
 class MemoryReader final : public Reader
 {
 private:
-    const shared_ptr<const uint8_t> mem;
+    shared_ptr<const uint8_t> mem;
     size_t offset;
     const size_t length;
 public:
     explicit MemoryReader(shared_ptr<const uint8_t> mem, size_t length)
         : mem(mem), offset(0), length(length)
+    {
+    }
+    explicit MemoryReader(shared_ptr<const vector<uint8_t>> mem)
+        : mem(mem, mem->data()), offset(0), length(mem->size())
+    {
+    }
+    explicit MemoryReader(const vector<uint8_t> &mem)
+        : offset(0), length(mem.size())
+    {
+        uint8_t * memory = new uint8_t[mem.size()];
+        for(size_t i = 0; i < mem.size(); i++)
+            memory[i] = mem[i];
+        this->mem = shared_ptr<uint8_t>(memory, [](uint8_t * memory){delete []memory;});
+    }
+    explicit MemoryReader(vector<uint8_t> &&mem)
+        : MemoryReader(make_shared<vector<uint8_t>>(std::move(mem)))
     {
     }
     template <size_t length>
@@ -899,6 +916,32 @@ public:
         if(offset >= length)
             throw EOFException();
         return mem.get()[offset++];
+    }
+};
+
+class MemoryWriter final : public Writer
+{
+private:
+    vector<uint8_t> memory;
+public:
+    MemoryWriter()
+    {
+    }
+    explicit MemoryWriter(size_t expectedLength)
+    {
+        memory.reserve(expectedLength);
+    }
+    virtual void writeByte(uint8_t v) override
+    {
+        memory.push_back(v);
+    }
+    const vector<uint8_t> & getBuffer() const &
+    {
+        return memory;
+    }
+    vector<uint8_t> && getBuffer() &&
+    {
+        return std::move(memory);
     }
 };
 
@@ -1035,6 +1078,10 @@ private:
 public:
     StreamServerWrapper(list<shared_ptr<StreamRW>> streams, shared_ptr<StreamServer> nextServer = nullptr)
         : streams(streams), nextServer(nextServer)
+    {
+    }
+    StreamServerWrapper(vector<shared_ptr<StreamRW>> streams, shared_ptr<StreamServer> nextServer = nullptr)
+        : streams(streams.begin(), streams.end()), nextServer(nextServer)
     {
     }
     virtual shared_ptr<StreamRW> accept() override
