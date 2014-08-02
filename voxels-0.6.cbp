@@ -54,6 +54,7 @@
 		</Linker>
 		<Unit filename="include/decoder/ogg_vorbis_decoder.h" />
 		<Unit filename="include/decoder/png_decoder.h" />
+		<Unit filename="include/networking/client.h" />
 		<Unit filename="include/networking/server.h" />
 		<Unit filename="include/physics/physics.h" />
 		<Unit filename="include/platform/audio.h" />
@@ -79,6 +80,7 @@
 		<Unit filename="include/util/arena_allocator.h" />
 		<Unit filename="include/util/balanced_tree.h" />
 		<Unit filename="include/util/block_chunk.h" />
+		<Unit filename="include/util/cached_variable.h" />
 		<Unit filename="include/util/circular_deque.h" />
 		<Unit filename="include/util/color.h" />
 		<Unit filename="include/util/dimension.h" />
@@ -94,6 +96,7 @@
 		<Unit filename="include/util/variable_set.h" />
 		<Unit filename="include/util/vector.h" />
 		<Unit filename="src/decoder/png_decoder.cpp" />
+		<Unit filename="src/networking/client.cpp" />
 		<Unit filename="src/networking/server.cpp" />
 		<Unit filename="src/physics/physics.cpp" />
 		<Unit filename="src/platform/audio.cpp" />

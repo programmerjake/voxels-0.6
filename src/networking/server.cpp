@@ -69,6 +69,18 @@ class Server
     shared_ptr<RenderObjectWorld> world;
     atomic_uint connectionCount;
     flag anyConnections, running;
+    static PositionF initialPositionF()
+    {
+        return PositionF(0.5, 64 + 10 + 0.5, 0.5, Dimension::Overworld);
+    }
+    static PositionI initialPositionI()
+    {
+        return (PositionI)initialPositionF();
+    }
+    static int32_t generateDistance()
+    {
+        return 50;
+    }
     struct Connection
     {
         atomic_uint &connectionCount;
@@ -94,6 +106,7 @@ class Server
     {
         VariableSet &variableSet = pconnection->variableSet;
         stream::write<RenderObjectWorld>(*pwriter, variableSet, world);
+        pwriter->flush();
     }
     void startConnection(shared_ptr<stream::StreamRW> streamRW)
     {
@@ -101,14 +114,14 @@ class Server
         thread(&Server::reader, this, pconnection, streamRW->preader()).detach();
         thread(&Server::writer, this, pconnection, streamRW->pwriter()).detach();
     }
-    void generateWorld()
+    void generateChunk(PositionI chunkPosition)
     {
-        for(int32_t x = -64; x < 64; x++)
+        for(int32_t x = chunkPosition.x; x < chunkPosition.x + RenderObjectChunk::BlockChunkType::chunkSizeX; x++)
         {
-            for(int32_t z = -64; z < 64; z++)
+            for(int32_t z = chunkPosition.z; z < chunkPosition.z + RenderObjectChunk::BlockChunkType::chunkSizeZ; z++)
             {
                 int32_t landHeight = (int32_t)(64 + 16 * (sin((float)x / 3) * sin((float)z / 3)));
-                for(int32_t y = 0; y < 256; y++)
+                for(int32_t y = chunkPosition.y; y < chunkPosition.y + RenderObjectChunk::BlockChunkType::chunkSizeY; y++)
                 {
                     if(y < landHeight)
                     {
@@ -123,6 +136,26 @@ class Server
                 }
             }
         }
+    }
+    void generateWorld()
+    {
+        PositionI minPosition = RenderObjectChunk::BlockChunkType::getChunkBasePosition(initialPositionI() - VectorI(generateDistance()));
+        PositionI maxPosition = RenderObjectChunk::BlockChunkType::getChunkBasePosition(initialPositionI() + VectorI(generateDistance()));
+        for(PositionI chunkPosition = minPosition; chunkPosition.x <= maxPosition.x; chunkPosition.x += RenderObjectChunk::BlockChunkType::chunkSizeX)
+        {
+            for(chunkPosition.y = minPosition.y; chunkPosition.y <= maxPosition.y; chunkPosition.y += RenderObjectChunk::BlockChunkType::chunkSizeY)
+            {
+                for(chunkPosition.z = minPosition.z; chunkPosition.z <= maxPosition.z; chunkPosition.z += RenderObjectChunk::BlockChunkType::chunkSizeZ)
+                {
+                    float progress = (float)(chunkPosition.z - minPosition.z) / (maxPosition.z - minPosition.z + RenderObjectChunk::BlockChunkType::chunkSizeZ);
+                    progress = (chunkPosition.y - minPosition.y + progress * RenderObjectChunk::BlockChunkType::chunkSizeY) / (maxPosition.y - minPosition.y + RenderObjectChunk::BlockChunkType::chunkSizeY);
+                    progress = (chunkPosition.x - minPosition.x + progress * RenderObjectChunk::BlockChunkType::chunkSizeX) / (maxPosition.x - minPosition.x + RenderObjectChunk::BlockChunkType::chunkSizeX);
+                    cout << "Generating World ... (" << (int)(100 * progress) << "%)\x1b[K\r" << flush;
+                    generateChunk(chunkPosition);
+                }
+            }
+        }
+        cout << "Generating World ... Done." << endl;
     }
     flag starting;
     void simulate()

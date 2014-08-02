@@ -316,8 +316,8 @@ void startGraphics()
     }
     else
     {
-        xResInternal = 1280;
-        yResInternal = 1024;
+        xResInternal = 1024;
+        yResInternal = 768;
     }
 #endif
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
@@ -748,6 +748,8 @@ static bool &keyState(KeyboardKey key)
 
 static MouseButton buttonState = MouseButton_None;
 
+static bool needQuitEvent = false;
+
 static Event *makeEvent()
 {
     static bool needCharEvent = false;
@@ -758,6 +760,11 @@ static Event *makeEvent()
         wchar_t character = characters[0];
         characters.erase(0, 1);
         return new KeyPressEvent(character);
+    }
+    if(needQuitEvent)
+    {
+        needQuitEvent = false;
+        return new QuitEvent();
     }
     while(true)
     {
@@ -840,7 +847,7 @@ struct DefaultEventHandler : public EventHandler
     {
         if(event.key == KeyboardKey_F4 && (event.mods & KeyboardModifiers_Alt) != 0)
         {
-            exit(0);
+            needQuitEvent = true;
             return true;
         }
         return true;

@@ -8,7 +8,11 @@
 #include "util/block_chunk.h"
 #include "util/enum_traits.h"
 #include "util/linked_map.h"
+#include "util/cached_variable.h"
 #include <functional>
+#include <algorithm>
+#include <mutex>
+#include <iostream>
 
 using namespace std;
 
@@ -148,31 +152,36 @@ struct RenderObjectChunk
     typedef BlockChunk<RenderObjectBlock> BlockChunkType;
     BlockChunkType blockChunk;
     enum_array<shared_ptr<CachedMesh>, RenderLayer> cachedMesh;
-private:
-    enum_array<shared_ptr<Mesh>, RenderLayer> drawMesh;
+    enum_array<atomic_bool, RenderLayer> cachedMeshValid;
+    mutex generateMeshesLock;
+    enum_array<CachedVariable<Mesh>, RenderLayer> drawMesh;
     atomic_bool meshesValid;
-public:
     RenderObjectChunk(PositionI position)
         : blockChunk(position), meshesValid(false)
     {
+        for(atomic_bool &v : cachedMeshValid)
+            v = false;
     }
     void invalidateMeshes()
     {
         meshesValid = false;
+        for(atomic_bool &v : cachedMeshValid)
+            v = false;
     }
     void invalidate()
     {
         invalidateMeshes();
         blockChunk.onChange();
     }
-private:
-    void drawAll(shared_ptr<RenderObjectChunk> nx, shared_ptr<RenderObjectChunk> px, shared_ptr<RenderObjectChunk> ny, shared_ptr<RenderObjectChunk> py, shared_ptr<RenderObjectChunk> nz, shared_ptr<RenderObjectChunk> pz)
+    bool generateDrawMeshes(shared_ptr<RenderObjectChunk> nx, shared_ptr<RenderObjectChunk> px, shared_ptr<RenderObjectChunk> ny, shared_ptr<RenderObjectChunk> py, shared_ptr<RenderObjectChunk> nz, shared_ptr<RenderObjectChunk> pz)
     {
+        lock_guard<mutex> lockIt(generateMeshesLock);
+        if(meshesValid)
+            return false;
         for(RenderLayer renderLayer : enum_traits<RenderLayer>())
         {
-            if(!drawMesh[renderLayer])
-                drawMesh[renderLayer] = make_shared<Mesh>();
-            drawMesh[renderLayer]->clear();
+            Mesh & mesh = drawMesh[renderLayer].writeRef();
+            mesh.clear();
             for(int32_t dx = 0; dx < BlockChunkType::chunkSizeX; dx++)
             {
                 for(int32_t dy = 0; dy < BlockChunkType::chunkSizeY; dy++)
@@ -187,24 +196,19 @@ private:
                         RenderObjectBlock bpx = (dx >= BlockChunkType::chunkSizeX - 1 ? (px != nullptr ? px->blockChunk.blocks[0][dy][dz] : RenderObjectBlock()) : blockChunk.blocks[dx + 1][dy][dz]);
                         RenderObjectBlock bpy = (dy >= BlockChunkType::chunkSizeY - 1 ? (py != nullptr ? py->blockChunk.blocks[dx][0][dz] : RenderObjectBlock()) : blockChunk.blocks[dx][dy + 1][dz]);
                         RenderObjectBlock bpz = (dz >= BlockChunkType::chunkSizeZ - 1 ? (pz != nullptr ? pz->blockChunk.blocks[dx][dy][0] : RenderObjectBlock()) : blockChunk.blocks[dx][dy][dz + 1]);
-                        blockChunk.blocks[dx][dy][dz].draw(*drawMesh[renderLayer], renderLayer, pos, bnx, bpx, bny, bpy, bnz, bpz);
+                        blockChunk.blocks[dx][dy][dz].draw(mesh, renderLayer, pos, bnx, bpx, bny, bpy, bnz, bpz);
                     }
                 }
             }
+            drawMesh[renderLayer].finishWrite();
+            cachedMeshValid[renderLayer] = false;
         }
+        meshesValid = true;
+        return true;
     }
-public:
-    const Mesh & getDrawMesh(RenderLayer renderLayer, shared_ptr<RenderObjectChunk> nx, shared_ptr<RenderObjectChunk> px, shared_ptr<RenderObjectChunk> ny, shared_ptr<RenderObjectChunk> py, shared_ptr<RenderObjectChunk> nz, shared_ptr<RenderObjectChunk> pz, bool * didGenerateMeshes = nullptr)
+    const Mesh & getDrawMesh(RenderLayer renderLayer)
     {
-        if(didGenerateMeshes)
-            *didGenerateMeshes = false;
-        if(!meshesValid.exchange(true))
-        {
-            drawAll(nx, px, ny, py, nz, pz);
-            if(didGenerateMeshes)
-                *didGenerateMeshes = true;
-        }
-        return *drawMesh[renderLayer];
+        return drawMesh[renderLayer].read();
     }
     static shared_ptr<RenderObjectChunk> read(stream::Reader &reader, VariableSet &variableSet)
     {
@@ -237,15 +241,53 @@ struct is_value_changed<RenderObjectChunk>
 class RenderObjectWorld
 {
     mutable ChangeTracker changeTracker;
-    linked_map<PositionI, shared_ptr<RenderObjectChunk>> chunks;
+    typedef linked_map<PositionI, shared_ptr<RenderObjectChunk>> ChunksMap;
+    ChunksMap chunks;
+    mutex chunksLock;
     shared_ptr<RenderObjectChunk> getChunk(PositionI pos)
     {
+        lock_guard<mutex> lockIt(chunksLock);
         auto iter = chunks.find(pos);
         if(iter == chunks.end())
             return nullptr;
         return std::get<1>(*iter);
     }
+    bool generateMesh(PositionI chunkPosition, shared_ptr<RenderObjectChunk> chunk = nullptr)
+    {
+        PositionI nxPos = chunkPosition - VectorI(RenderObjectChunk::BlockChunkType::chunkSizeX, 0, 0);
+        PositionI pxPos = chunkPosition + VectorI(RenderObjectChunk::BlockChunkType::chunkSizeX, 0, 0);
+        PositionI nyPos = chunkPosition - VectorI(0, RenderObjectChunk::BlockChunkType::chunkSizeY, 0);
+        PositionI pyPos = chunkPosition + VectorI(0, RenderObjectChunk::BlockChunkType::chunkSizeY, 0);
+        PositionI nzPos = chunkPosition - VectorI(0, 0, RenderObjectChunk::BlockChunkType::chunkSizeZ);
+        PositionI pzPos = chunkPosition + VectorI(0, 0, RenderObjectChunk::BlockChunkType::chunkSizeZ);
+        if(chunk == nullptr)
+            chunk = getChunk(chunkPosition);
+        if(chunk == nullptr)
+            return false;
+        return chunk->generateDrawMeshes(getChunk(nxPos), getChunk(pxPos), getChunk(nyPos), getChunk(pyPos), getChunk(nzPos), getChunk(pzPos));
+    }
 public:
+    bool generateMeshes(PositionI pos)
+    {
+        vector<ChunksMap::iterator> chunksList;
+        {
+            lock_guard<mutex> lockIt(chunksLock);
+            chunksList.reserve(chunks.size());
+            for(auto iter = chunks.begin(); iter != chunks.end(); iter++)
+            {
+                if(std::get<1>(*iter)->meshesValid)
+                    continue;
+                chunksList.push_back(iter);
+            }
+        }
+        std::sort(chunksList.begin(), chunksList.end(), [&pos](ChunksMap::iterator a, ChunksMap::iterator b)->bool
+        {
+            return absSquared((VectorI)pos - (VectorI)std::get<0>(*a)) < absSquared((VectorI)pos - (VectorI)std::get<0>(*b));
+        });
+        if(chunksList.empty())
+            return false;
+        return generateMesh(std::get<0>(*chunksList.front()), std::get<1>(*chunksList.front()));
+    }
     void draw(Renderer & renderer, Matrix tform, RenderLayer renderLayer, PositionI pos, int32_t viewDistance, function<Mesh(Mesh mesh, PositionI chunkBasePosition)> filterFn, bool needFilterUpdate)
     {
         assert(viewDistance > 0);
@@ -260,19 +302,15 @@ public:
             {
                 for(blockPosition.z = minBlockPosition.z; blockPosition.z <= maxBlockPosition.z; blockPosition.z += RenderObjectChunk::BlockChunkType::chunkSizeZ)
                 {
-                    PositionI nxPos = blockPosition - VectorI(RenderObjectChunk::BlockChunkType::chunkSizeX, 0, 0);
-                    PositionI pxPos = blockPosition + VectorI(RenderObjectChunk::BlockChunkType::chunkSizeX, 0, 0);
-                    PositionI nyPos = blockPosition - VectorI(0, RenderObjectChunk::BlockChunkType::chunkSizeY, 0);
-                    PositionI pyPos = blockPosition + VectorI(0, RenderObjectChunk::BlockChunkType::chunkSizeY, 0);
-                    PositionI nzPos = blockPosition - VectorI(0, 0, RenderObjectChunk::BlockChunkType::chunkSizeZ);
-                    PositionI pzPos = blockPosition + VectorI(0, 0, RenderObjectChunk::BlockChunkType::chunkSizeZ);
                     shared_ptr<RenderObjectChunk> chunk = getChunk(blockPosition);
                     if(chunk != nullptr)
                     {
-                        bool isNewMesh;
-                        const Mesh &mesh = chunk->getDrawMesh(renderLayer, getChunk(nxPos), getChunk(pxPos), getChunk(nyPos), getChunk(pyPos), getChunk(nzPos), getChunk(pzPos), &isNewMesh);
-                        if(isNewMesh || !chunk->cachedMesh[renderLayer] || needFilterUpdate)
+                        const Mesh &mesh = chunk->getDrawMesh(renderLayer);
+                        if(!chunk->cachedMesh[renderLayer] || !chunk->cachedMeshValid[renderLayer] || needFilterUpdate)
+                        {
                             chunk->cachedMesh[renderLayer] = renderer.cacheMesh(filterFn(mesh, blockPosition));
+                            chunk->cachedMeshValid[renderLayer] = true;
+                        }
                         renderer << transform(tform, chunk->cachedMesh[renderLayer]);
                     }
                 }
@@ -310,12 +348,16 @@ public:
     }
     void setBlock(PositionI position, RenderObjectBlock block)
     {
-        shared_ptr<RenderObjectChunk> & pchunk = chunks[RenderObjectChunk::BlockChunkType::getChunkBasePosition(position)];
-        if(pchunk == nullptr)
+        shared_ptr<RenderObjectChunk> *ppchunk;
         {
-            pchunk = shared_ptr<RenderObjectChunk>(new RenderObjectChunk(RenderObjectChunk::BlockChunkType::getChunkBasePosition(position)));
+            lock_guard<mutex> lockIt(chunksLock);
+            ppchunk = &chunks[RenderObjectChunk::BlockChunkType::getChunkBasePosition(position)];
+            if(*ppchunk == nullptr)
+            {
+                *ppchunk = shared_ptr<RenderObjectChunk>(new RenderObjectChunk(RenderObjectChunk::BlockChunkType::getChunkBasePosition(position)));
+            }
         }
-        RenderObjectChunk & chunk = *pchunk;
+        RenderObjectChunk &chunk = **ppchunk;
         PositionI relativePosition = RenderObjectChunk::BlockChunkType::getChunkRelativePosition(position);
         chunk.blockChunk.blocks[relativePosition.x][relativePosition.y][relativePosition.z] = block;
         invalidateBlock(position);
@@ -327,11 +369,16 @@ public:
         shared_ptr<RenderObjectWorld> retval = make_shared<RenderObjectWorld>();
         for(uint32_t i = 0; i < chunkCount; i++)
         {
+            cout << "Reading World ... (" << 100 * i / chunkCount << "%)\x1b[K\r" << flush;
             shared_ptr<RenderObjectChunk> chunk = stream::read<RenderObjectChunk>(reader, variableSet);
             if(!chunk || retval->chunks.count(chunk->blockChunk.basePosition) > 0)
+            {
+                cout << "Reading World ... Error!" << endl;
                 throw stream::InvalidDataValueException("chunk already in world");
+            }
             retval->chunks[chunk->blockChunk.basePosition] = chunk;
         }
+        cout << "Reading World ... Done." << endl;
         return retval;
     }
     void write(stream::Writer &writer, VariableSet &variableSet)

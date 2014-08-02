@@ -33,6 +33,7 @@
 #include <vector>
 #include "util/string_cast.h"
 #include "util/enum_traits.h"
+#include "util/circular_deque.h"
 #ifdef DEBUG_STREAM
 #include <iostream>
 #define DUMP_V(fn, v) do {cerr << #fn << ": read " << v << endl;} while(false)
@@ -127,6 +128,10 @@ public:
     {
     }
     virtual uint8_t readByte() = 0;
+    virtual bool dataAvailable() // return if data is available without waiting
+    {
+        return false;
+    }
     void readBytes(uint8_t * array, size_t count)
     {
         for(size_t i = 0; i < count; i++)
@@ -349,6 +354,10 @@ public:
     virtual void writeByte(uint8_t) = 0;
     virtual void flush()
     {
+    }
+    virtual bool writeWaits()
+    {
+        return true;
     }
     void writeBytes(const uint8_t * array, size_t count)
     {
@@ -911,6 +920,10 @@ public:
         : MemoryReader(shared_ptr<const uint8_t>(&a[0], [](const uint8_t *){}))
     {
     }
+    virtual bool dataAvailable() override
+    {
+        return offset < length;
+    }
     virtual uint8_t readByte() override
     {
         if(offset >= length)
@@ -942,6 +955,10 @@ public:
     vector<uint8_t> && getBuffer() &&
     {
         return std::move(memory);
+    }
+    virtual bool writeWaits() override
+    {
+        return false;
     }
 };
 
@@ -982,6 +999,10 @@ public:
     {
     }
     virtual uint8_t readByte() override;
+    virtual bool dataAvailable() override
+    {
+        return reader.dataAvailable();
+    }
 };
 
 struct StreamRW
@@ -1095,6 +1116,79 @@ public:
         shared_ptr<StreamRW> retval = streams.front();
         streams.pop_front();
         return retval;
+    }
+};
+
+template <size_t BufferSize = 32768>
+class BufferedReader final : public Reader
+{
+    shared_ptr<Reader> preader;
+    circularDeque<uint8_t, BufferSize + 1> buffer;
+    void readChunk()
+    {
+        for(;;)
+        {
+            if(buffer.size() >= buffer.capacity())
+                return;
+            if(preader->dataAvailable())
+                buffer.push_back(preader->readByte());
+            else
+                return;
+        }
+    }
+public:
+    BufferedReader(shared_ptr<Reader> preader)
+        : preader(preader)
+    {
+    }
+    virtual bool dataAvailable() override
+    {
+        return !buffer.empty() || preader->dataAvailable();
+    }
+    virtual uint8_t readByte() override
+    {
+        if(buffer.empty())
+            readChunk();
+        if(buffer.empty())
+            return preader->readByte();
+        uint8_t retval = buffer.front();
+        buffer.pop_front();
+        return retval;
+    }
+};
+
+template <size_t BufferSize = 32768>
+class BufferedWriter final : public Writer
+{
+    shared_ptr<Writer> pwriter;
+    circularDeque<uint8_t, BufferSize + 1> buffer;
+    void writeBuffer(bool writeAll)
+    {
+        while(!buffer.empty() && (writeAll || buffer.size() >= buffer.capacity() || !pwriter->writeWaits()))
+        {
+            pwriter->writeByte(buffer.front());
+            buffer.pop_front();
+        }
+    }
+public:
+    BufferedWriter(shared_ptr<Writer> pwriter)
+        : pwriter(pwriter)
+    {
+    }
+    virtual bool writeWaits() override
+    {
+        return buffer.size() >= buffer.capacity() && pwriter->writeWaits();
+    }
+    virtual void flush() override
+    {
+        writeBuffer(true);
+        pwriter->flush();
+    }
+    virtual void writeByte(uint8_t v) override
+    {
+        if(buffer.size() >= buffer.capacity() / 2)
+            writeBuffer(false);
+        buffer.push_back(v);
     }
 };
 

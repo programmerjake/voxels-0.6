@@ -110,6 +110,12 @@ public:
     virtual ~ExpandReader()
     {
     }
+    virtual bool dataAvailable() override
+    {
+        if(currentCode.eof())
+            return false;
+        return true;
+    }
     virtual uint8_t readByte() override
     {
         while(currentCode.eof())
@@ -309,6 +315,10 @@ public:
         if(currentInput.size() < bufferSize)
             return;
         writeCode();
+    }
+    virtual bool writeWaits() override
+    {
+        return currentInput.size() >= bufferSize;
     }
 };
 

@@ -40,6 +40,9 @@ struct EventHandler
     virtual bool handleKeyDown(KeyDownEvent &event) = 0;
     virtual bool handleKeyPress(KeyPressEvent &event) = 0;
     virtual bool handleQuit(QuitEvent &event) = 0;
+    virtual ~EventHandler()
+    {
+    }
 };
 
 class Event
