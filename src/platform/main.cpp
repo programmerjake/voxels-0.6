@@ -68,6 +68,8 @@ int error(wstring msg)
 int myMain(vector<wstring> args)
 {
     args.erase(args.begin());
+    while(!args.empty() && args.front() == L"")
+        args.erase(args.begin());
     bool isServer = false, isClient = false;
     wstring clientAddr;
     for(auto i = args.begin(); i != args.end(); i++)

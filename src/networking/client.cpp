@@ -81,7 +81,11 @@ class Client
                 }
                 case NetworkEventType::SendBlockUpdate:
                 {
-#warning finish
+                    shared_ptr<stream::Reader> pEventReader = event.getReader();
+                    stream::Reader &eventReader = *pEventReader;
+                    PositionI blockPosition = stream::read<PositionI>(eventReader);
+                    RenderObjectBlock block = stream::read<RenderObjectBlock>(eventReader, variableSet);
+                    world->setBlock(blockPosition, block);
                     break;
                 }
                 case NetworkEventType::RequestChunk:
@@ -149,7 +153,7 @@ class Client
         {
             assert(world);
             if(!world->generateMeshes((PositionI)getViewPosition()));
-                this_thread::sleep_for(chrono::milliseconds(1));
+                this_thread::sleep_for(chrono::milliseconds(5));
         }
     }
     struct MyEventHandler : public EventHandler
@@ -224,7 +228,7 @@ public:
             for(RenderLayer renderLayer : enum_traits<RenderLayer>())
             {
                 r << renderLayer;
-                world->draw(r, inverse(tform), renderLayer, (PositionI)getViewPosition(), 100, [&](Mesh m, PositionI chunkBasePosition)->Mesh
+                world->draw(r, inverse(tform), renderLayer, (PositionI)getViewPosition(), 50, [&](Mesh m, PositionI chunkBasePosition)->Mesh
                 {
                     return lightMesh(m, lightVertex);
                 }, false, [&](PositionI chunkPos)
@@ -254,5 +258,5 @@ public:
 
 void runClient(shared_ptr<stream::StreamRW> streamRW)
 {
-    Client(streamRW).run();
+    (new Client(streamRW))->run();
 }

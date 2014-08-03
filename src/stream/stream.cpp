@@ -37,7 +37,7 @@ struct Pipe
     mutex lock;
     condition_variable_any cond;
     bool closed = false;
-    int readerBufferIndex;
+    int readerBufferIndex = 0;
     int writerBufferIndex() const
     {
         return 1 - readerBufferIndex;

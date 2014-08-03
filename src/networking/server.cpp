@@ -8,7 +8,10 @@
 #include <thread>
 #include <cmath>
 #include <mutex>
+#include <deque>
 #include <condition_variable>
+#include <chrono>
+#include <random>
 #include "util/unlock_guard.h"
 
 using namespace std;
@@ -97,6 +100,10 @@ class Server
         mutex requestedChunksLock;
         mutex eventWaitMutex;
         condition_variable_any eventWaitCond;
+        unordered_set<PositionI> sentChunks;
+        mutex blockUpdatesMutex;
+        unordered_set<PositionI> blockUpdatesSet;
+        deque<PositionI> blockUpdatesQueue;
         Connection(atomic_uint &connectionCount, flag &anyConnections)
             : connectionCount(connectionCount), anyConnections(anyConnections)
         {
@@ -114,7 +121,7 @@ class Server
     void reader(shared_ptr<Connection> pconnection, shared_ptr<stream::Reader> preader)
     {
         Connection &connection = *pconnection;
-        connection.viewPosition = PositionF(0.5, 0.5 + 64 + 10, 0.5, Dimension::Overworld);
+        connection.viewPosition = initialPositionF();
         connection.hasViewPosition = true;
         NetworkEvent event;
         while(running && !connection.done)
@@ -159,8 +166,16 @@ class Server
         lock_guard<mutex> lockIt(connection.requestedChunksLock);
         vector<PositionI> requestedChunks;
         requestedChunks.reserve(connection.requestedChunks.size());
-        for(PositionI pos : connection.requestedChunks)
+        for(auto i = connection.requestedChunks.begin(); i != connection.requestedChunks.end();)
         {
+            PositionI pos = *i;
+            if(connection.sentChunks.find(pos) != connection.sentChunks.end())
+            {
+                i = connection.requestedChunks.erase(i);
+                continue;
+            }
+            else
+                i++;
             if(!queueGenerateChunk(pos)) // then the chunk exists
             {
                 requestedChunks.push_back(pos);
@@ -177,6 +192,26 @@ class Server
         stream::write<RenderObjectChunk>(chunkDataWriter, connection.variableSet, world->getChunk(requestedChunks.front()));
         NetworkEvent event(NetworkEventType::SendNewChunk, std::move(chunkDataWriter));
         stream::write<NetworkEvent>(writer, std::move(event));
+        connection.requestedChunks.erase(requestedChunks.front());
+        connection.sentChunks.insert(requestedChunks.front());
+        writer.flush();
+        return true;
+    }
+    bool writeBlockUpdates(Connection &connection, stream::Writer &writer)
+    {
+        PositionI position;
+        {
+            lock_guard<mutex> lockIt(connection.blockUpdatesMutex);
+            if(connection.blockUpdatesQueue.empty())
+                return false;
+            position = connection.blockUpdatesQueue.front();
+            connection.blockUpdatesQueue.pop_front();
+            connection.blockUpdatesSet.erase(position);
+        }
+        stream::MemoryWriter eventWriter;
+        stream::write<PositionI>(eventWriter, position);
+        stream::write<RenderObjectBlock>(eventWriter, connection.variableSet, world->getBlock(position));
+        stream::write<NetworkEvent>(writer, NetworkEvent(NetworkEventType::SendBlockUpdate, std::move(eventWriter)));
         writer.flush();
         return true;
     }
@@ -190,20 +225,26 @@ class Server
             pwriter->flush();
             while(running && !connection.done)
             {
+                bool didAnything = false;
                 if(connection.needKeepalive.exchange(false))
                 {
                     NetworkEvent event(NetworkEventType::Keepalive);
                     stream::write<NetworkEvent>(*pwriter, event);
                     pwriter->flush();
+                    didAnything = true;
                 }
-                else if(writeRequestedChunks(connection, *pwriter))
+                if(writeBlockUpdates(connection, *pwriter))
                 {
+                    didAnything = true;
                 }
-                else
+                if(writeRequestedChunks(connection, *pwriter))
                 {
-                    lock_guard<mutex> lockIt(connection.eventWaitMutex);
-                    connection.eventWaitCond.wait(connection.eventWaitMutex);
+                    didAnything = true;
                 }
+                if(didAnything)
+                    continue;
+                lock_guard<mutex> lockIt(connection.eventWaitMutex);
+                connection.eventWaitCond.wait(connection.eventWaitMutex);
             }
         }
         catch(stream::IOException &e)
@@ -223,6 +264,14 @@ class Server
         }
         thread(&Server::reader, this, pconnection, streamRW->preader()).detach();
         thread(&Server::writer, this, pconnection, streamRW->pwriter()).detach();
+    }
+    unordered_set<PositionI> blockUpdateSet;
+    mutex blockUpdateLock;
+    void setBlock(PositionI pos, RenderObjectBlock block)
+    {
+        lock_guard<mutex> lockIt(blockUpdateLock);
+        world->setBlock(pos, block);
+        blockUpdateSet.insert(pos);
     }
     void generateChunk(PositionI chunkPosition)
     {
@@ -259,7 +308,6 @@ class Server
         }
         lock_guard<mutex> lockIt(generateChunksLock);
         generatedChunks.insert(chunkPosition);
-        cout << "Generated : " << (VectorI)chunkPosition << endl;
     }
     void generateWorld()
     {
@@ -285,12 +333,84 @@ class Server
     {
         return (chunkPos.d != playerPos.d ? 16 : 1) * absSquared((VectorI)chunkPos - 0.5 * VectorF(RenderObjectChunk::BlockChunkType::chunkSizeX, RenderObjectChunk::BlockChunkType::chunkSizeY, RenderObjectChunk::BlockChunkType::chunkSizeZ) - (VectorF)playerPos);
     }
+    void moveAllBlockUpdatesToConnections()
+    {
+        unordered_set<PositionI> blockUpdates;
+        {
+            lock_guard<mutex> lockIt(blockUpdateLock);
+            blockUpdates = std::move(blockUpdateSet);
+            blockUpdateSet.clear();
+        }
+        if(blockUpdates.empty())
+            return;
+        lock_guard<mutex> lockIt(connectionsListLock);
+        for(auto i = connectionsList.begin(); i != connectionsList.end();)
+        {
+            weak_ptr<Connection> wpConnection = *i;
+            shared_ptr<Connection> pConnection = wpConnection.lock();
+            if(!pConnection)
+            {
+                i = connectionsList.erase(i);
+                continue;
+            }
+            else
+                i++;
+            Connection &connection = *pConnection;
+            lock_guard<mutex> lockIt2(connection.blockUpdatesMutex);
+            for(PositionI pos : blockUpdates)
+            {
+                if(std::get<1>(connection.blockUpdatesSet.insert(pos)))
+                    connection.blockUpdatesQueue.push_back(pos);
+            }
+            connection.eventWaitCond.notify_all();
+        }
+    }
     flag starting;
     void simulate()
     {
         generateWorld();
         starting = false;
-        running.wait(false);
+        auto lastTime = chrono::steady_clock::now();
+        default_random_engine randomEngine;
+        uniform_int_distribution<int32_t> xzPositionDistribution(-16, 16), yPositionDistribution(32, 96), blockTypeDistribution(0, 3);
+        while(running)
+        {
+            for(size_t i = 0; i < 100; i++)
+            {
+                PositionI pos = PositionI(xzPositionDistribution(randomEngine), yPositionDistribution(randomEngine), xzPositionDistribution(randomEngine), Dimension::Overworld);
+                int32_t blockType = blockTypeDistribution(randomEngine);
+                if(absSquared(pos - initialPositionF()) < 25)
+                    continue;
+                if(world->getBlock(pos))
+                {
+                    RenderObjectBlock block;
+                    switch(blockType)
+                    {
+                    case 0:
+                        block = getDirt();
+                        break;
+                    case 1:
+                        block = getGlass();
+                        break;
+                    case 2:
+                        block = getAir();
+                        break;
+                    default:
+                        block = getStone();
+                        break;
+                    }
+                    setBlock(pos, block);
+                }
+            }
+
+            moveAllBlockUpdatesToConnections();
+
+            auto currentTime = chrono::steady_clock::now();
+            auto sleepTillTime = lastTime + chrono::nanoseconds((int_fast64_t)(1e9 / 20.0));
+            lastTime = currentTime;
+            if(currentTime < sleepTillTime)
+                this_thread::sleep_for(sleepTillTime - currentTime);
+        }
     }
     unordered_set<PositionI> needGenerateChunks;
     unordered_set<PositionI> generatingChunks;
@@ -405,5 +525,5 @@ public:
 
 void runServer(shared_ptr<stream::StreamServer> streamServer)
 {
-    Server(streamServer).run();
+    (new Server(streamServer))->run();
 }

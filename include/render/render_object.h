@@ -128,6 +128,14 @@ struct RenderObjectBlock
         : descriptor(descriptor)
     {
     }
+    explicit operator bool() const
+    {
+        return (bool)descriptor;
+    }
+    bool operator ~() const
+    {
+        return !descriptor;
+    }
 };
 
 namespace stream
@@ -153,6 +161,13 @@ struct RenderObjectChunk
     BlockChunkType blockChunk;
     enum_array<shared_ptr<CachedMesh>, RenderLayer> cachedMesh;
     enum_array<atomic_bool, RenderLayer> cachedMeshValid;
+    static constexpr int subChunkSizeShiftAmount = 2;
+    static constexpr int32_t subChunkSize = (int32_t)1 << subChunkSizeShiftAmount;
+    static_assert(BlockChunkType::chunkSizeX % subChunkSize == 0, "BlockChunkType::chunkSizeX is not divisible by subChunkSize");
+    static_assert(BlockChunkType::chunkSizeY % subChunkSize == 0, "BlockChunkType::chunkSizeY is not divisible by subChunkSize");
+    static_assert(BlockChunkType::chunkSizeZ % subChunkSize == 0, "BlockChunkType::chunkSizeZ is not divisible by subChunkSize");
+    enum_array<array<array<array<Mesh, BlockChunkType::chunkSizeZ / subChunkSize>, BlockChunkType::chunkSizeY / subChunkSize>, BlockChunkType::chunkSizeX / subChunkSize>, RenderLayer> subChunkMeshes;
+    enum_array<array<array<array<atomic_bool, BlockChunkType::chunkSizeZ / subChunkSize>, BlockChunkType::chunkSizeY / subChunkSize>, BlockChunkType::chunkSizeX / subChunkSize>, RenderLayer> subChunkMeshesValid;
     mutex generateMeshesLock;
     enum_array<CachedVariable<Mesh>, RenderLayer> drawMesh;
     atomic_bool meshesValid;
@@ -161,24 +176,108 @@ struct RenderObjectChunk
     {
         for(atomic_bool &v : cachedMeshValid)
             v = false;
+        for(auto &block : subChunkMeshesValid)
+        {
+            for(auto &slab : block)
+            {
+                for(auto &column : slab)
+                {
+                    for(atomic_bool &v : column)
+                        v = false;
+                }
+            }
+        }
     }
     RenderObjectChunk(const BlockChunkType & chunk)
         : blockChunk(chunk), meshesValid(false)
     {
         for(atomic_bool &v : cachedMeshValid)
             v = false;
+        for(auto &block : subChunkMeshesValid)
+        {
+            for(auto &slab : block)
+            {
+                for(auto &column : slab)
+                {
+                    for(atomic_bool &v : column)
+                        v = false;
+                }
+            }
+        }
     }
     void invalidateMeshes()
     {
         meshesValid = false;
         for(atomic_bool &v : cachedMeshValid)
             v = false;
+        for(auto &block : subChunkMeshesValid)
+        {
+            for(auto &slab : block)
+            {
+                for(auto &column : slab)
+                {
+                    for(atomic_bool &v : column)
+                        v = false;
+                }
+            }
+        }
     }
     void invalidate()
     {
         invalidateMeshes();
         blockChunk.onChange();
     }
+    void invalidateMeshes(PositionI position)
+    {
+        assert(position.d == blockChunk.basePosition.d);
+        meshesValid = false;
+        for(atomic_bool &v : cachedMeshValid)
+            v = false;
+        VectorI relativePosition = position - blockChunk.basePosition;
+        assert(relativePosition.x >= 0 && relativePosition.x < BlockChunkType::chunkSizeX);
+        assert(relativePosition.y >= 0 && relativePosition.y < BlockChunkType::chunkSizeY);
+        assert(relativePosition.z >= 0 && relativePosition.z < BlockChunkType::chunkSizeZ);
+        VectorI subChunkPos = VectorI(relativePosition.x >> subChunkSizeShiftAmount,
+                                      relativePosition.y >> subChunkSizeShiftAmount,
+                                      relativePosition.z >> subChunkSizeShiftAmount);
+        for(auto &chunk : subChunkMeshesValid)
+            chunk[subChunkPos.x][subChunkPos.y][subChunkPos.z] = false;
+    }
+    void invalidate(PositionI position)
+    {
+        invalidateMeshes(position);
+        blockChunk.onChange();
+    }
+private:
+    const Mesh &generateSubChunkDrawMeshes(RenderLayer renderLayer, VectorI subChunkPosition, shared_ptr<RenderObjectChunk> nx, shared_ptr<RenderObjectChunk> px, shared_ptr<RenderObjectChunk> ny, shared_ptr<RenderObjectChunk> py, shared_ptr<RenderObjectChunk> nz, shared_ptr<RenderObjectChunk> pz)
+    {
+        atomic_bool &subChunkValid = subChunkMeshesValid[renderLayer][subChunkPosition.x >> subChunkSizeShiftAmount][subChunkPosition.y >> subChunkSizeShiftAmount][subChunkPosition.z >> subChunkSizeShiftAmount];
+        Mesh &mesh = subChunkMeshes[renderLayer][subChunkPosition.x >> subChunkSizeShiftAmount][subChunkPosition.y >> subChunkSizeShiftAmount][subChunkPosition.z >> subChunkSizeShiftAmount];
+        if(subChunkValid)
+            return mesh;
+        mesh.clear();
+        for(int32_t dx = subChunkPosition.x; dx < subChunkPosition.x + subChunkSize; dx++)
+        {
+            for(int32_t dy = subChunkPosition.y; dy < subChunkPosition.y + subChunkSize; dy++)
+            {
+                for(int32_t dz = subChunkPosition.z; dz < subChunkPosition.z + subChunkSize; dz++)
+                {
+                    VectorI dpos = VectorI(dx, dy, dz);
+                    PositionI pos = blockChunk.basePosition + dpos;
+                    RenderObjectBlock bnx = (dx <= 0 ? (nx != nullptr ? nx->blockChunk.blocks[BlockChunkType::chunkSizeX - 1][dy][dz] : RenderObjectBlock()) : blockChunk.blocks[dx - 1][dy][dz]);
+                    RenderObjectBlock bny = (dy <= 0 ? (ny != nullptr ? ny->blockChunk.blocks[dx][BlockChunkType::chunkSizeY - 1][dz] : RenderObjectBlock()) : blockChunk.blocks[dx][dy - 1][dz]);
+                    RenderObjectBlock bnz = (dz <= 0 ? (nz != nullptr ? nz->blockChunk.blocks[dx][dy][BlockChunkType::chunkSizeZ - 1] : RenderObjectBlock()) : blockChunk.blocks[dx][dy][dz - 1]);
+                    RenderObjectBlock bpx = (dx >= BlockChunkType::chunkSizeX - 1 ? (px != nullptr ? px->blockChunk.blocks[0][dy][dz] : RenderObjectBlock()) : blockChunk.blocks[dx + 1][dy][dz]);
+                    RenderObjectBlock bpy = (dy >= BlockChunkType::chunkSizeY - 1 ? (py != nullptr ? py->blockChunk.blocks[dx][0][dz] : RenderObjectBlock()) : blockChunk.blocks[dx][dy + 1][dz]);
+                    RenderObjectBlock bpz = (dz >= BlockChunkType::chunkSizeZ - 1 ? (pz != nullptr ? pz->blockChunk.blocks[dx][dy][0] : RenderObjectBlock()) : blockChunk.blocks[dx][dy][dz + 1]);
+                    blockChunk.blocks[dx][dy][dz].draw(mesh, renderLayer, pos, bnx, bpx, bny, bpy, bnz, bpz);
+                }
+            }
+        }
+        subChunkValid = true;
+        return mesh;
+    }
+public:
     bool generateDrawMeshes(shared_ptr<RenderObjectChunk> nx, shared_ptr<RenderObjectChunk> px, shared_ptr<RenderObjectChunk> ny, shared_ptr<RenderObjectChunk> py, shared_ptr<RenderObjectChunk> nz, shared_ptr<RenderObjectChunk> pz)
     {
         lock_guard<mutex> lockIt(generateMeshesLock);
@@ -188,21 +287,13 @@ struct RenderObjectChunk
         {
             Mesh & mesh = drawMesh[renderLayer].writeRef();
             mesh.clear();
-            for(int32_t dx = 0; dx < BlockChunkType::chunkSizeX; dx++)
+            for(int32_t dx = 0; dx < BlockChunkType::chunkSizeX; dx += subChunkSize)
             {
-                for(int32_t dy = 0; dy < BlockChunkType::chunkSizeY; dy++)
+                for(int32_t dy = 0; dy < BlockChunkType::chunkSizeY; dy += subChunkSize)
                 {
-                    for(int32_t dz = 0; dz < BlockChunkType::chunkSizeZ; dz++)
+                    for(int32_t dz = 0; dz < BlockChunkType::chunkSizeZ; dz += subChunkSize)
                     {
-                        VectorI dpos = VectorI(dx, dy, dz);
-                        PositionI pos = blockChunk.basePosition + dpos;
-                        RenderObjectBlock bnx = (dx <= 0 ? (nx != nullptr ? nx->blockChunk.blocks[BlockChunkType::chunkSizeX - 1][dy][dz] : RenderObjectBlock()) : blockChunk.blocks[dx - 1][dy][dz]);
-                        RenderObjectBlock bny = (dy <= 0 ? (ny != nullptr ? ny->blockChunk.blocks[dx][BlockChunkType::chunkSizeY - 1][dz] : RenderObjectBlock()) : blockChunk.blocks[dx][dy - 1][dz]);
-                        RenderObjectBlock bnz = (dz <= 0 ? (nz != nullptr ? nz->blockChunk.blocks[dx][dy][BlockChunkType::chunkSizeZ - 1] : RenderObjectBlock()) : blockChunk.blocks[dx][dy][dz - 1]);
-                        RenderObjectBlock bpx = (dx >= BlockChunkType::chunkSizeX - 1 ? (px != nullptr ? px->blockChunk.blocks[0][dy][dz] : RenderObjectBlock()) : blockChunk.blocks[dx + 1][dy][dz]);
-                        RenderObjectBlock bpy = (dy >= BlockChunkType::chunkSizeY - 1 ? (py != nullptr ? py->blockChunk.blocks[dx][0][dz] : RenderObjectBlock()) : blockChunk.blocks[dx][dy + 1][dz]);
-                        RenderObjectBlock bpz = (dz >= BlockChunkType::chunkSizeZ - 1 ? (pz != nullptr ? pz->blockChunk.blocks[dx][dy][0] : RenderObjectBlock()) : blockChunk.blocks[dx][dy][dz + 1]);
-                        blockChunk.blocks[dx][dy][dz].draw(mesh, renderLayer, pos, bnx, bpx, bny, bpy, bnz, bpz);
+                        mesh.append(generateSubChunkDrawMeshes(renderLayer, VectorI(dx, dy, dz), nx, px, ny, py, nz, pz));
                     }
                 }
             }
@@ -332,6 +423,12 @@ private:
     {
         shared_ptr<RenderObjectChunk> chunk = getChunk(RenderObjectChunk::BlockChunkType::getChunkBasePosition(position));
         if(chunk != nullptr)
+            chunk->invalidateMeshes(position);
+    }
+    void invalidateChunkMeshesAll(PositionI position)
+    {
+        shared_ptr<RenderObjectChunk> chunk = getChunk(RenderObjectChunk::BlockChunkType::getChunkBasePosition(position));
+        if(chunk != nullptr)
             chunk->invalidateMeshes();
     }
     void invalidateBlock(PositionI position)
@@ -340,7 +437,7 @@ private:
         shared_ptr<RenderObjectChunk> chunk = getChunk(chunkBasePosition);
         if(chunk == nullptr)
             return;
-        chunk->invalidate();
+        chunk->invalidate(position);
         for(BlockFace face : enum_traits<BlockFace>())
         {
             invalidateChunkMeshes(position + getDelta(face));
@@ -416,12 +513,12 @@ public:
             chunks[chunkPosition] = chunk;
         }
         changeTracker.onChange();
-        invalidateChunkMeshes(chunkPosition - VectorI(RenderObjectChunk::BlockChunkType::chunkSizeX, 0, 0));
-        invalidateChunkMeshes(chunkPosition + VectorI(RenderObjectChunk::BlockChunkType::chunkSizeX, 0, 0));
-        invalidateChunkMeshes(chunkPosition - VectorI(0, RenderObjectChunk::BlockChunkType::chunkSizeY, 0));
-        invalidateChunkMeshes(chunkPosition + VectorI(0, RenderObjectChunk::BlockChunkType::chunkSizeY, 0));
-        invalidateChunkMeshes(chunkPosition - VectorI(0, 0, RenderObjectChunk::BlockChunkType::chunkSizeZ));
-        invalidateChunkMeshes(chunkPosition + VectorI(0, 0, RenderObjectChunk::BlockChunkType::chunkSizeZ));
+        invalidateChunkMeshesAll(chunkPosition - VectorI(RenderObjectChunk::BlockChunkType::chunkSizeX, 0, 0));
+        invalidateChunkMeshesAll(chunkPosition + VectorI(RenderObjectChunk::BlockChunkType::chunkSizeX, 0, 0));
+        invalidateChunkMeshesAll(chunkPosition - VectorI(0, RenderObjectChunk::BlockChunkType::chunkSizeY, 0));
+        invalidateChunkMeshesAll(chunkPosition + VectorI(0, RenderObjectChunk::BlockChunkType::chunkSizeY, 0));
+        invalidateChunkMeshesAll(chunkPosition - VectorI(0, 0, RenderObjectChunk::BlockChunkType::chunkSizeZ));
+        invalidateChunkMeshesAll(chunkPosition + VectorI(0, 0, RenderObjectChunk::BlockChunkType::chunkSizeZ));
     }
 };
 

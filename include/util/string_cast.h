@@ -30,6 +30,8 @@ inline string string_cast<string>(wstring wstr)
 {
     size_t destLen = wstr.length() * 4 + 1 + 32/*for extra buffer space*/;
     char *str = new char[destLen];
+    for(size_t i = 0; i < destLen; i++)
+        str[i] = 0;
     const wchar_t *ptr = wstr.c_str();
     mbstate_t mbstate;
     memset((void *)&mbstate, 0, sizeof(mbstate));
@@ -52,6 +54,8 @@ inline wstring string_cast<wstring>(string str)
 {
     size_t destLen = str.length() + 1 + 32/* for extra buffer space*/;
     wchar_t *wstr = new wchar_t[destLen];
+    for(size_t i = 0; i < destLen; i++)
+        wstr[i] = 0;
     const char *ptr = str.c_str();
     mbstate_t mbstate;
     memset((void *)&mbstate, 0, sizeof(mbstate));
