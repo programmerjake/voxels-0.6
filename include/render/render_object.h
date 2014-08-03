@@ -162,6 +162,12 @@ struct RenderObjectChunk
         for(atomic_bool &v : cachedMeshValid)
             v = false;
     }
+    RenderObjectChunk(const BlockChunkType & chunk)
+        : blockChunk(chunk), meshesValid(false)
+    {
+        for(atomic_bool &v : cachedMeshValid)
+            v = false;
+    }
     void invalidateMeshes()
     {
         meshesValid = false;
@@ -244,6 +250,7 @@ class RenderObjectWorld
     typedef linked_map<PositionI, shared_ptr<RenderObjectChunk>> ChunksMap;
     ChunksMap chunks;
     mutex chunksLock;
+public:
     shared_ptr<RenderObjectChunk> getChunk(PositionI pos)
     {
         lock_guard<mutex> lockIt(chunksLock);
@@ -252,6 +259,7 @@ class RenderObjectWorld
             return nullptr;
         return std::get<1>(*iter);
     }
+private:
     bool generateMesh(PositionI chunkPosition, shared_ptr<RenderObjectChunk> chunk = nullptr)
     {
         PositionI nxPos = chunkPosition - VectorI(RenderObjectChunk::BlockChunkType::chunkSizeX, 0, 0);
@@ -288,7 +296,7 @@ public:
             return false;
         return generateMesh(std::get<0>(*chunksList.front()), std::get<1>(*chunksList.front()));
     }
-    void draw(Renderer & renderer, Matrix tform, RenderLayer renderLayer, PositionI pos, int32_t viewDistance, function<Mesh(Mesh mesh, PositionI chunkBasePosition)> filterFn, bool needFilterUpdate)
+    void draw(Renderer & renderer, Matrix tform, RenderLayer renderLayer, PositionI pos, int32_t viewDistance, function<Mesh(Mesh mesh, PositionI chunkBasePosition)> filterFn, bool needFilterUpdate, function<void(PositionI chunkBasePosition)> needChunkCallback = nullptr)
     {
         assert(viewDistance > 0);
         PositionI minPosition = pos - VectorI(viewDistance);
@@ -313,6 +321,8 @@ public:
                         }
                         renderer << transform(tform, chunk->cachedMesh[renderLayer]);
                     }
+                    else if(needChunkCallback)
+                        needChunkCallback(blockPosition);
                 }
             }
         }
@@ -390,10 +400,28 @@ public:
         {
             stream::write<RenderObjectChunk>(writer, variableSet, std::get<1>(*iter));
         }
+        changeTracker.onWrite(variableSet);
     }
     bool getChanged(VariableSet &variableSet) const
     {
         return changeTracker.getChanged(variableSet);
+    }
+    void setChunk(shared_ptr<RenderObjectChunk> chunk)
+    {
+        assert(chunk);
+        PositionI chunkPosition = chunk->blockChunk.basePosition;
+        assert(RenderObjectChunk::BlockChunkType::getChunkBasePosition(chunkPosition) == chunkPosition);
+        {
+            lock_guard<mutex> lockIt(chunksLock);
+            chunks[chunkPosition] = chunk;
+        }
+        changeTracker.onChange();
+        invalidateChunkMeshes(chunkPosition - VectorI(RenderObjectChunk::BlockChunkType::chunkSizeX, 0, 0));
+        invalidateChunkMeshes(chunkPosition + VectorI(RenderObjectChunk::BlockChunkType::chunkSizeX, 0, 0));
+        invalidateChunkMeshes(chunkPosition - VectorI(0, RenderObjectChunk::BlockChunkType::chunkSizeY, 0));
+        invalidateChunkMeshes(chunkPosition + VectorI(0, RenderObjectChunk::BlockChunkType::chunkSizeY, 0));
+        invalidateChunkMeshes(chunkPosition - VectorI(0, 0, RenderObjectChunk::BlockChunkType::chunkSizeZ));
+        invalidateChunkMeshes(chunkPosition + VectorI(0, 0, RenderObjectChunk::BlockChunkType::chunkSizeZ));
     }
 };
 

@@ -71,11 +71,13 @@ public:
     }
     virtual uint8_t readByte() override
     {
+        assert(pipe->readerBufferIndex >= 0 && pipe->readerBufferIndex <= 1);
         if(pipe->readerPosition < pipe->bufferSizes[pipe->readerBufferIndex])
         {
             return pipe->buffers[pipe->readerBufferIndex][pipe->readerPosition++];
         }
         pipe->lock.lock();
+        assert(pipe->readerBufferIndex >= 0 && pipe->readerBufferIndex <= 1);
         pipe->bufferSizes[pipe->readerBufferIndex] = 0;
         pipe->readerPosition = 0;
         while(!pipe->writerReadyToSwapBuffers)
@@ -86,8 +88,10 @@ public:
                 throw EOFException();
             }
             pipe->cond.wait(pipe->lock);
+            assert(pipe->readerBufferIndex >= 0 && pipe->readerBufferIndex <= 1);
         }
         pipe->readerBufferIndex = pipe->writerBufferIndex();
+        assert(pipe->readerBufferIndex >= 0 && pipe->readerBufferIndex <= 1);
         assert(pipe->bufferSizes[pipe->readerBufferIndex] > 0);
         uint8_t retval = pipe->buffers[pipe->readerBufferIndex][pipe->readerPosition++];
         pipe->writerReadyToSwapBuffers = false;

@@ -9,6 +9,9 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <cmath>
+#include <condition_variable>
+#include "stream/network_event.h"
 
 using namespace std;
 
@@ -20,10 +23,37 @@ class Client
     flag running, starting;
     shared_ptr<stream::StreamRW> streamRW;
     VariableSet variableSet;
-    PositionF position = PositionF(0.5, 0.5 + 64 + 10, 0.5, Dimension::Overworld);
-    PositionI getViewPosition() const
+    PositionF viewPosition = PositionF(0.5, 0.5 + 64 + 10, 0.5, Dimension::Overworld);
+    float viewPhi = 0, viewTheta = 0;
+    float deltaPhi = 0, deltaTheta = 0;
+    atomic_bool positionRequested;
+    unordered_set<PositionI> neededChunks;
+    mutex neededChunksLock;
+    mutex writerWaitLock;
+    condition_variable_any writerWaitCond;
+    PositionF getViewPosition() const
     {
-        return (PositionI)position;
+        return viewPosition;
+    }
+    float getViewPhi() const
+    {
+        return viewPhi;
+    }
+    float getViewTheta() const
+    {
+        return viewTheta;
+    }
+    void setViewTheta(float v)
+    {
+        viewTheta = v;
+    }
+    void setViewPhi(float v)
+    {
+        viewPhi = v;
+    }
+    void setViewPosition(PositionF v)
+    {
+        viewPosition = v;
     }
     void reader(shared_ptr<stream::Reader> preader)
     {
@@ -31,6 +61,33 @@ class Client
         {
             world = stream::read<RenderObjectWorld>(*preader, variableSet);
             starting = false;
+            NetworkEvent event;
+            while(running)
+            {
+                event = stream::read<NetworkEvent>(*preader);
+                switch(event.type)
+                {
+                case NetworkEventType::Keepalive:
+                    break;
+                case NetworkEventType::SendNewChunk:
+                {
+                    shared_ptr<RenderObjectChunk> chunk = stream::read<RenderObjectChunk>(*event.getReader(), variableSet);
+                    if(!chunk)
+                        break;
+                    world->setChunk(chunk);
+                    lock_guard<mutex> lockIt(neededChunksLock);
+                    neededChunks.erase(chunk->blockChunk.basePosition);
+                    break;
+                }
+                case NetworkEventType::SendBlockUpdate:
+                {
+#warning finish
+                    break;
+                }
+                case NetworkEventType::RequestChunk:
+                    break;
+                }
+            }
         }
         catch(stream::IOException &e)
         {
@@ -42,8 +99,42 @@ class Client
     }
     void writer(shared_ptr<stream::Writer> pwriter)
     {
+        unordered_set<PositionI> sentChunkRequests;
         try
         {
+            while(running)
+            {
+                bool didAnything = false;
+                {
+                    PositionI chunkPosition;
+                    bool gotChunk = false;
+                    {
+                        lock_guard<mutex> lockIt(neededChunksLock);
+                        for(PositionI cPos : neededChunks)
+                        {
+                            if(std::get<1>(sentChunkRequests.insert(cPos)))
+                            {
+                                gotChunk = true;
+                                chunkPosition = cPos;
+                                break;
+                            }
+                        }
+                    }
+                    if(gotChunk)
+                    {
+                        didAnything = true;
+                        stream::MemoryWriter eventWriter;
+                        stream::write<PositionI>(eventWriter, chunkPosition);
+                        stream::write<NetworkEvent>(*pwriter, NetworkEvent(NetworkEventType::RequestChunk, std::move(eventWriter)));
+                        pwriter->flush();
+                    }
+                }
+                if(!didAnything)
+                {
+                    lock_guard<mutex> lockIt(writerWaitLock);
+                    writerWaitCond.wait(writerWaitLock);
+                }
+            }
         }
         catch(stream::IOException &e)
         {
@@ -57,7 +148,7 @@ class Client
         while(running)
         {
             assert(world);
-            if(!world->generateMeshes(getViewPosition()));
+            if(!world->generateMeshes((PositionI)getViewPosition()));
                 this_thread::sleep_for(chrono::milliseconds(1));
         }
     }
@@ -78,7 +169,9 @@ class Client
         }
         virtual bool handleMouseMove(MouseMoveEvent &event) override
         {
-            return false;
+            client.deltaTheta -= event.deltaX / 300;
+            client.deltaPhi -= event.deltaY / 300;
+            return true;
         }
         virtual bool handleMouseScroll(MouseScrollEvent &event) override
         {
@@ -109,7 +202,7 @@ class Client
 
 public:
     Client(shared_ptr<stream::StreamRW> streamRW)
-        : streamRW(streamRW)
+        : streamRW(streamRW), positionRequested(true)
     {
     }
     void run()
@@ -121,23 +214,39 @@ public:
         thread(&Client::meshGenerator, this).detach();
         starting.wait(false);
         startGraphics();
+        Display::grabMouse(true);
         Renderer r;
         while(running)
         {
             Display::clear();
-            Matrix tform = Matrix::rotateY(Display::timer() / 5 * M_PI).concat(Matrix::translate((VectorF)position));
+            Matrix tform = Matrix::rotateX(getViewPhi()).concat(Matrix::rotateY(getViewTheta())).concat(Matrix::translate((VectorF)getViewPosition()));
+            bool anyNeededChunks = false;
             for(RenderLayer renderLayer : enum_traits<RenderLayer>())
             {
                 r << renderLayer;
-                world->draw(r, inverse(tform), renderLayer, (PositionI)position, 64, [&](Mesh m, PositionI chunkBasePosition)->Mesh
+                world->draw(r, inverse(tform), renderLayer, (PositionI)getViewPosition(), 100, [&](Mesh m, PositionI chunkBasePosition)->Mesh
                 {
                     return lightMesh(m, lightVertex);
-                }, false);
+                }, false, [&](PositionI chunkPos)
+                {
+                    lock_guard<mutex> lockIt(neededChunksLock);
+                    neededChunks.insert(chunkPos);
+                    anyNeededChunks = true;
+                });
+            }
+            if(anyNeededChunks)
+            {
+                writerWaitCond.notify_all();
             }
             Display::flip(60);
             Display::handleEvents(shared_ptr<EventHandler>(new MyEventHandler(*this)));
+            setViewTheta(fmod(getViewTheta() + deltaTheta * 0.5, 2 * M_PI));
+            deltaTheta *= 0.5;
+            setViewPhi(limit<float>(getViewPhi() + deltaPhi * 0.5, -M_PI / 2, M_PI / 2));
+            deltaPhi *= 0.5;
         }
         running = false;
+        writerWaitCond.notify_all();
         endGraphics();
     }
 };

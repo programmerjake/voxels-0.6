@@ -37,6 +37,11 @@ struct BlockChunk
         return PositionI(pos.x & (chunkSizeX - 1), pos.y & (chunkSizeY - 1), pos.z & (chunkSizeZ - 1), pos.d);
     }
     array<array<array<T, chunkSizeZ>, chunkSizeY>, chunkSizeX> blocks;
+    BlockChunk(const BlockChunk & rt)
+        : basePosition(rt.basePosition), blocks(rt.blocks)
+    {
+        changeTracker.onChange();
+    }
 private:
     static void readInternal(shared_ptr<BlockChunk> chunk, stream::Reader &reader, VariableSet &variableSet)
     {

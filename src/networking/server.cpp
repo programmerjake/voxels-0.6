@@ -7,6 +7,9 @@
 #include "render/generate.h"
 #include <thread>
 #include <cmath>
+#include <mutex>
+#include <condition_variable>
+#include "util/unlock_guard.h"
 
 using namespace std;
 
@@ -79,13 +82,21 @@ class Server
     }
     static int32_t generateDistance()
     {
-        return 50;
+        return 16;
     }
     struct Connection
     {
         atomic_uint &connectionCount;
         flag &anyConnections;
         VariableSet variableSet;
+        PositionF viewPosition;
+        atomic_bool hasViewPosition;
+        atomic_bool done;
+        atomic_bool needKeepalive;
+        unordered_set<PositionI> requestedChunks;
+        mutex requestedChunksLock;
+        mutex eventWaitMutex;
+        condition_variable_any eventWaitCond;
         Connection(atomic_uint &connectionCount, flag &anyConnections)
             : connectionCount(connectionCount), anyConnections(anyConnections)
         {
@@ -98,44 +109,157 @@ class Server
                 anyConnections = false;
         }
     };
+    list<weak_ptr<Connection>> connectionsList;
+    mutex connectionsListLock;
     void reader(shared_ptr<Connection> pconnection, shared_ptr<stream::Reader> preader)
     {
-
+        Connection &connection = *pconnection;
+        connection.viewPosition = PositionF(0.5, 0.5 + 64 + 10, 0.5, Dimension::Overworld);
+        connection.hasViewPosition = true;
+        NetworkEvent event;
+        while(running && !connection.done)
+        {
+            try
+            {
+                event = stream::read<NetworkEvent>(*preader);
+                switch(event.type)
+                {
+                case NetworkEventType::Keepalive:
+                    connection.needKeepalive = true;
+                    connection.eventWaitCond.notify_all();
+                    break;
+                case NetworkEventType::SendNewChunk:
+                    break;
+                case NetworkEventType::SendBlockUpdate:
+                    break;
+                case NetworkEventType::RequestChunk:
+                {
+                    shared_ptr<stream::Reader> pEventReader = event.getReader();
+                    PositionI chunkPosition = stream::read<PositionI>(*pEventReader);
+                    if(chunkPosition != RenderObjectChunk::BlockChunkType::getChunkBasePosition(chunkPosition))
+                        break;
+                    lock_guard<mutex> lockIt(connection.requestedChunksLock);
+                    connection.requestedChunks.insert(chunkPosition);
+                    connection.eventWaitCond.notify_all();
+                    break;
+                }
+                }
+            }
+            catch(stream::IOException &e)
+            {
+                cerr << "IO Error : " << e.what() << endl;
+                connection.done = true;
+            }
+        }
+        connection.eventWaitCond.notify_all();
+        connection.done = true;
+    }
+    bool writeRequestedChunks(Connection &connection, stream::Writer &writer)
+    {
+        lock_guard<mutex> lockIt(connection.requestedChunksLock);
+        vector<PositionI> requestedChunks;
+        requestedChunks.reserve(connection.requestedChunks.size());
+        for(PositionI pos : connection.requestedChunks)
+        {
+            if(!queueGenerateChunk(pos)) // then the chunk exists
+            {
+                requestedChunks.push_back(pos);
+            }
+        }
+        if(requestedChunks.empty())
+            return false;
+        PositionF playerPos = connection.viewPosition;
+        std::sort(requestedChunks.begin(), requestedChunks.end(), [&](PositionI a, PositionI b)
+        {
+            return chunkDistanceMetric(a, playerPos) < chunkDistanceMetric(b, playerPos);
+        });
+        stream::MemoryWriter chunkDataWriter;
+        stream::write<RenderObjectChunk>(chunkDataWriter, connection.variableSet, world->getChunk(requestedChunks.front()));
+        NetworkEvent event(NetworkEventType::SendNewChunk, std::move(chunkDataWriter));
+        stream::write<NetworkEvent>(writer, std::move(event));
+        writer.flush();
+        return true;
     }
     void writer(shared_ptr<Connection> pconnection, shared_ptr<stream::Writer> pwriter)
     {
         VariableSet &variableSet = pconnection->variableSet;
-        stream::write<RenderObjectWorld>(*pwriter, variableSet, world);
-        pwriter->flush();
+        Connection &connection = *pconnection;
+        try
+        {
+            stream::write<RenderObjectWorld>(*pwriter, variableSet, world);
+            pwriter->flush();
+            while(running && !connection.done)
+            {
+                if(connection.needKeepalive.exchange(false))
+                {
+                    NetworkEvent event(NetworkEventType::Keepalive);
+                    stream::write<NetworkEvent>(*pwriter, event);
+                    pwriter->flush();
+                }
+                else if(writeRequestedChunks(connection, *pwriter))
+                {
+                }
+                else
+                {
+                    lock_guard<mutex> lockIt(connection.eventWaitMutex);
+                    connection.eventWaitCond.wait(connection.eventWaitMutex);
+                }
+            }
+        }
+        catch(stream::IOException &e)
+        {
+            cerr << "IO Error : " << e.what() << endl;
+            connection.done = true;
+        }
+        connection.eventWaitCond.notify_all();
+        connection.done = true;
     }
     void startConnection(shared_ptr<stream::StreamRW> streamRW)
     {
         shared_ptr<Connection> pconnection = shared_ptr<Connection>(new Connection(connectionCount, anyConnections));
+        {
+            lock_guard<mutex> lockIt(connectionsListLock);
+            connectionsList.push_back(pconnection);
+        }
         thread(&Server::reader, this, pconnection, streamRW->preader()).detach();
         thread(&Server::writer, this, pconnection, streamRW->pwriter()).detach();
     }
     void generateChunk(PositionI chunkPosition)
     {
-        for(int32_t x = chunkPosition.x; x < chunkPosition.x + RenderObjectChunk::BlockChunkType::chunkSizeX; x++)
         {
-            for(int32_t z = chunkPosition.z; z < chunkPosition.z + RenderObjectChunk::BlockChunkType::chunkSizeZ; z++)
+            RenderObjectChunk::BlockChunkType blockChunk(chunkPosition);
+            for(int32_t x = chunkPosition.x; x < chunkPosition.x + RenderObjectChunk::BlockChunkType::chunkSizeX; x++)
             {
-                int32_t landHeight = (int32_t)(64 + 16 * (sin((float)x / 3) * sin((float)z / 3)));
-                for(int32_t y = chunkPosition.y; y < chunkPosition.y + RenderObjectChunk::BlockChunkType::chunkSizeY; y++)
+                for(int32_t z = chunkPosition.z; z < chunkPosition.z + RenderObjectChunk::BlockChunkType::chunkSizeZ; z++)
                 {
-                    if(y < landHeight)
+                    int32_t landHeight = (int32_t)(64 + 16 * (sin((float)x / 3) * sin((float)z / 3)));
+                    for(int32_t y = chunkPosition.y; y < chunkPosition.y + RenderObjectChunk::BlockChunkType::chunkSizeY; y++)
                     {
-                        world->setBlock(PositionI(x, y, z, Dimension::Overworld), getStone());
+                        if(y < landHeight)
+                        {
+                            blockChunk.blocks[x - chunkPosition.x][y - chunkPosition.y][z - chunkPosition.z] = getStone();
+                        }
+                        else if(y <= landHeight)
+                        {
+                            blockChunk.blocks[x - chunkPosition.x][y - chunkPosition.y][z - chunkPosition.z] = getDirt();
+                        }
+                        else if(y == landHeight + 1)
+                        {
+                            blockChunk.blocks[x - chunkPosition.x][y - chunkPosition.y][z - chunkPosition.z] = getGlass();
+                        }
+                        else
+                        {
+                            blockChunk.blocks[x - chunkPosition.x][y - chunkPosition.y][z - chunkPosition.z] = getAir();
+                        }
                     }
-                    else if(y <= landHeight)
-                        world->setBlock(PositionI(x, y, z, Dimension::Overworld), getDirt());
-                    else if(y == landHeight + 1)
-                        world->setBlock(PositionI(x, y, z, Dimension::Overworld), getGlass());
-                    else
-                        world->setBlock(PositionI(x, y, z, Dimension::Overworld), getAir());
                 }
             }
+            shared_ptr<RenderObjectChunk> chunk = make_shared<RenderObjectChunk>(blockChunk);
+            world->setChunk(chunk);
         }
+        lock_guard<mutex> lockIt(generateChunksLock);
+        generatedChunks.insert(chunkPosition);
+        cout << "Generated : " << (VectorI)chunkPosition << endl;
     }
     void generateWorld()
     {
@@ -157,12 +281,95 @@ class Server
         }
         cout << "Generating World ... Done." << endl;
     }
+    static float chunkDistanceMetric(PositionI chunkPos, PositionF playerPos)
+    {
+        return (chunkPos.d != playerPos.d ? 16 : 1) * absSquared((VectorI)chunkPos - 0.5 * VectorF(RenderObjectChunk::BlockChunkType::chunkSizeX, RenderObjectChunk::BlockChunkType::chunkSizeY, RenderObjectChunk::BlockChunkType::chunkSizeZ) - (VectorF)playerPos);
+    }
     flag starting;
     void simulate()
     {
         generateWorld();
         starting = false;
         running.wait(false);
+    }
+    unordered_set<PositionI> needGenerateChunks;
+    unordered_set<PositionI> generatingChunks;
+    unordered_set<PositionI> generatedChunks;
+    mutex generateChunksLock;
+    condition_variable_any generateChunksCond;
+    bool queueGenerateChunk(PositionI chunkPosition) // returns if the chunk is not generated
+    {
+        lock_guard<mutex> lockIt(generateChunksLock);
+        if(generatedChunks.find(chunkPosition) != generatedChunks.end())
+            return false;
+        if(generatingChunks.find(chunkPosition) != generatingChunks.end())
+            return true;
+        bool sizeWasZero = needGenerateChunks.empty();
+        needGenerateChunks.insert(chunkPosition);
+        if(sizeWasZero)
+            generateChunksCond.notify_all();
+        return true;
+    }
+    void chunkGenerator()
+    {
+        vector<pair<PositionI, float>> chunksList;
+        vector<PositionF> playerPositions;
+        starting.wait(false);
+        lock_guard<mutex> lockIt(generateChunksLock);
+        while(running)
+        {
+            while(running && needGenerateChunks.empty())
+            {
+                generateChunksCond.wait(generateChunksLock);
+            }
+            if(!running)
+                break;
+            playerPositions.clear();
+            {
+                lock_guard<mutex> lockIt2(connectionsListLock);
+                for(auto i = connectionsList.begin(); i != connectionsList.end();)
+                {
+                    weak_ptr<Connection> wpConnection = *i;
+                    shared_ptr<Connection> pConnection = wpConnection.lock();
+                    if(!pConnection)
+                    {
+                        i = connectionsList.erase(i);
+                        continue;
+                    }
+                    else
+                        i++;
+                    if(pConnection->hasViewPosition)
+                    {
+                        playerPositions.push_back(pConnection->viewPosition);
+                    }
+                }
+            }
+            chunksList.clear();
+            chunksList.reserve(needGenerateChunks.size());
+            for(PositionI p : needGenerateChunks)
+            {
+                float minDistanceSquared = 1e20;
+                for(PositionF playerPosition : playerPositions)
+                {
+                    float distanceSquared = chunkDistanceMetric(p, playerPosition);
+                    if(distanceSquared < minDistanceSquared)
+                        minDistanceSquared = distanceSquared;
+                }
+                chunksList.push_back(make_pair(p, minDistanceSquared));
+            }
+            sort(chunksList.begin(), chunksList.end(), [](pair<PositionI, float> a, pair<PositionI, float> b)->bool
+            {
+                return std::get<1>(a) < std::get<1>(b);
+            });
+            PositionI chunkPosition = std::get<0>(chunksList.front());
+            needGenerateChunks.erase(chunkPosition);
+            generatingChunks.insert(chunkPosition);
+            {
+                unlock_guard<mutex> unlockIt(generateChunksLock);
+                generateChunk(chunkPosition);
+            }
+            generatingChunks.erase(chunkPosition);
+        }
     }
 public:
     Server(shared_ptr<stream::StreamServer> streamServer)
@@ -174,8 +381,11 @@ public:
         running = true;
         starting = true;
         thread(&Server::simulate, this).detach();
+        constexpr size_t generateChunkThreadCount = 5;
+        for(size_t i = 0; i < generateChunkThreadCount; i++)
+            thread(&Server::chunkGenerator, this).detach();
         starting.wait(false);
-        while(true)
+        while(running)
         {
             try
             {
@@ -188,6 +398,7 @@ public:
         }
         anyConnections.wait(false);
         running = false;
+        generateChunksCond.notify_all();
     }
 };
 }

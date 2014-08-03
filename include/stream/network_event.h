@@ -6,10 +6,11 @@
 
 enum class NetworkEventType : uint8_t
 {
-    None,
+    Keepalive,
     SendNewChunk,
     SendBlockUpdate,
-    DEFINE_ENUM_LIMITS(None, None)
+    RequestChunk,
+    DEFINE_ENUM_LIMITS(Keepalive, RequestChunk)
 };
 
 class NetworkEvent final
@@ -19,6 +20,10 @@ public:
 private:
     vector<uint8_t> bytes;
 public:
+    NetworkEvent(NetworkEventType type = NetworkEventType::Keepalive)
+        : type(type), bytes()
+    {
+    }
     NetworkEvent(NetworkEventType type, const stream::MemoryWriter &writer)
         : type(type), bytes(writer.getBuffer())
     {
