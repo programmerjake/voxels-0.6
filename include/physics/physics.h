@@ -67,7 +67,7 @@ public:
     {
         assert(script);
     }
-    void operator()(PositionF & position, VectorF velocity) const;
+    void operator()(PositionF &position, VectorF &velocity) const;
     shared_ptr<Script> getScript() const
     {
         return script;

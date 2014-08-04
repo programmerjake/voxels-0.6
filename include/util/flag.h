@@ -64,6 +64,23 @@ public:
 
         lock.unlock();
     }
+    void waitThenReset(bool v = true) /// waits until value == v then set value to !v
+    {
+        if(v == value.exchange(!v))
+        {
+            cond.notify_all();
+            return;
+        }
+
+        lock.lock();
+
+        while(v != value.exchange(!v))
+        {
+            cond.wait(lock);
+        }
+        cond.notify_all();
+        lock.unlock();
+    }
     void set()
     {
         *this = true;

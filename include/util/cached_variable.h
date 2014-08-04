@@ -8,28 +8,56 @@ template <typename T>
 class CachedVariable
 {
     std::atomic_uint_fast8_t viewIndex;
-    T views[2];
+    T view1, view2;
 public:
     CachedVariable()
-        : viewIndex(0)
+        : viewIndex(0), view1(), view2()
     {
     }
-    const T & read() const
+    CachedVariable(const T &v)
+        : viewIndex(0), view1(v), view2()
     {
-        return views[viewIndex ? 1 : 0];
     }
-    T & writeRef()
+    CachedVariable(T &&v)
+        : viewIndex(0), view1(std::move(v)), view2()
     {
-        return views[viewIndex ? 0 : 1];
+    }
+    CachedVariable(const CachedVariable &rt)
+        : CachedVariable(rt.read())
+    {
+    }
+    const T &read() const
+    {
+        return viewIndex ? view2 : view1;
+    }
+    T &writeRef()
+    {
+        return viewIndex ? view1 : view2;
     }
     void finishWrite()
     {
         viewIndex ^= 1;
     }
-    void write(const T & value)
+    void write(const T &value)
     {
         writeRef() = value;
         finishWrite();
+    }
+    operator const T &() const
+    {
+        return read();
+    }
+    const T &operator =(const T &value)
+    {
+        writeRef() = value;
+        finishWrite();
+        return read();
+    }
+    const T &operator =(const CachedVariable &rt)
+    {
+        writeRef() = rt.read();
+        finishWrite();
+        return read();
     }
 };
 

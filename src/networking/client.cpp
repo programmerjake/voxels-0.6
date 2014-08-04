@@ -12,6 +12,7 @@
 #include <cmath>
 #include <condition_variable>
 #include "stream/network_event.h"
+#include "util/cached_variable.h"
 
 using namespace std;
 
@@ -23,14 +24,13 @@ class Client
     flag running, starting;
     shared_ptr<stream::StreamRW> streamRW;
     VariableSet variableSet;
-    PositionF viewPosition = PositionF(0.5, 0.5 + 64 + 10, 0.5, Dimension::Overworld);
+    CachedVariable<PositionF> viewPosition = PositionF(0.5, 0.5 + 64 + 10, 0.5, Dimension::Overworld);
     float viewPhi = 0, viewTheta = 0;
     float deltaPhi = 0, deltaTheta = 0;
-    atomic_bool positionRequested;
+    atomic_bool positionChanged;
     unordered_set<PositionI> neededChunks;
     mutex neededChunksLock;
-    mutex writerWaitLock;
-    condition_variable_any writerWaitCond;
+    flag somethingToWrite;
     PositionF getViewPosition() const
     {
         return viewPosition;
@@ -53,7 +53,11 @@ class Client
     }
     void setViewPosition(PositionF v)
     {
+        if(viewPosition.read() == v)
+            return;
         viewPosition = v;
+        positionChanged = true;
+        somethingToWrite.set();
     }
     void reader(shared_ptr<stream::Reader> preader)
     {
@@ -89,6 +93,8 @@ class Client
                     break;
                 }
                 case NetworkEventType::RequestChunk:
+                    break;
+                case NetworkEventType::SendPlayerProperties:
                     break;
                 }
             }
@@ -133,10 +139,19 @@ class Client
                         pwriter->flush();
                     }
                 }
+                {
+                    if(positionChanged.exchange(false))
+                    {
+                        stream::MemoryWriter eventWriter;
+                        stream::write<PositionF>(eventWriter, getViewPosition());
+                        stream::write<NetworkEvent>(*pwriter, NetworkEvent(NetworkEventType::SendPlayerProperties, std::move(eventWriter)));
+                        pwriter->flush();
+                        didAnything = true;
+                    }
+                }
                 if(!didAnything)
                 {
-                    lock_guard<mutex> lockIt(writerWaitLock);
-                    writerWaitCond.wait(writerWaitLock);
+                    somethingToWrite.waitThenReset(true);
                 }
             }
         }
@@ -156,6 +171,18 @@ class Client
                 this_thread::sleep_for(chrono::milliseconds(5));
         }
     }
+    bool isWDown = false;
+    bool isADown = false;
+    bool isSDown = false;
+    bool isDDown = false;
+    bool isQDown = false;
+    bool isSpaceDown = false;
+    bool isEDown = false;
+    bool gotSpaceDown = false;
+    bool isLShiftDown = false;
+    bool isRShiftDown = false;
+    bool isShiftDown = false;
+    bool isFDown = false;
     struct MyEventHandler : public EventHandler
     {
         Client & client;
@@ -183,10 +210,115 @@ class Client
         }
         virtual bool handleKeyUp(KeyUpEvent &event) override
         {
+            if(event.key == KeyboardKey_A)
+            {
+                client.isADown = false;
+                return true;
+            }
+            if(event.key == KeyboardKey_S)
+            {
+                client.isSDown = false;
+                return true;
+            }
+            if(event.key == KeyboardKey_D)
+            {
+                client.isDDown = false;
+                return true;
+            }
+            if(event.key == KeyboardKey_Q)
+            {
+                client.isQDown = false;
+                return true;
+            }
+            if(event.key == KeyboardKey_W)
+            {
+                client.isWDown = false;
+                return true;
+            }
+            if(event.key == KeyboardKey_E)
+            {
+                client.isEDown = false;
+                return true;
+            }
+            if(event.key == KeyboardKey_F)
+            {
+                client.isFDown = false;
+                return true;
+            }
+            if(event.key == KeyboardKey_Space)
+            {
+                client.isSpaceDown = false;
+                return true;
+            }
+            if(event.key == KeyboardKey_LShift)
+            {
+                client.isLShiftDown = false;
+                client.isShiftDown = client.isRShiftDown;
+                return true;
+            }
+            if(event.key == KeyboardKey_RShift)
+            {
+                client.isRShiftDown = false;
+                client.isShiftDown = client.isLShiftDown;
+                return true;
+            }
             return false;
         }
         virtual bool handleKeyDown(KeyDownEvent &event) override
         {
+            if(event.key == KeyboardKey_A)
+            {
+                client.isADown = true;
+                return true;
+            }
+            if(event.key == KeyboardKey_S)
+            {
+                client.isSDown = true;
+                return true;
+            }
+            if(event.key == KeyboardKey_D)
+            {
+                client.isDDown = true;
+                return true;
+            }
+            if(event.key == KeyboardKey_Q)
+            {
+                client.isQDown = true;
+                return true;
+            }
+            if(event.key == KeyboardKey_W)
+            {
+                client.isWDown = true;
+                return true;
+            }
+            if(event.key == KeyboardKey_E)
+            {
+                client.isEDown = true;
+                return true;
+            }
+            if(event.key == KeyboardKey_F)
+            {
+                client.isFDown = true;
+                return true;
+            }
+            if(event.key == KeyboardKey_Space)
+            {
+                client.isSpaceDown = true;
+                client.gotSpaceDown = true;
+                return true;
+            }
+            if(event.key == KeyboardKey_LShift)
+            {
+                client.isLShiftDown = true;
+                client.isShiftDown = true;
+                return true;
+            }
+            if(event.key == KeyboardKey_RShift)
+            {
+                client.isRShiftDown = true;
+                client.isShiftDown = true;
+                return true;
+            }
             return false;
         }
         virtual bool handleKeyPress(KeyPressEvent &event) override
@@ -206,7 +338,7 @@ class Client
 
 public:
     Client(shared_ptr<stream::StreamRW> streamRW)
-        : streamRW(streamRW), positionRequested(true)
+        : streamRW(streamRW), positionChanged(true)
     {
     }
     void run()
@@ -240,7 +372,7 @@ public:
             }
             if(anyNeededChunks)
             {
-                writerWaitCond.notify_all();
+                somethingToWrite.set();
             }
             Display::flip(60);
             Display::handleEvents(shared_ptr<EventHandler>(new MyEventHandler(*this)));
@@ -248,9 +380,29 @@ public:
             deltaTheta *= 0.5;
             setViewPhi(limit<float>(getViewPhi() + deltaPhi * 0.5, -M_PI / 2, M_PI / 2));
             deltaPhi *= 0.5;
+            VectorF deltaPosition = VectorF(0);
+            VectorF forwardVector = Matrix::rotateY(getViewTheta()).applyNoTranslate(VectorF(0, 0, -1));
+            VectorF leftVector = Matrix::rotateY(getViewTheta()).applyNoTranslate(VectorF(-1, 0, 0));
+            VectorF upVector = VectorF(0, 1, 0);
+            if(isWDown)
+                deltaPosition += forwardVector;
+            if(isSDown)
+                deltaPosition -= forwardVector;
+            if(isADown)
+                deltaPosition += leftVector;
+            if(isDDown)
+                deltaPosition -= leftVector;
+            if(isSpaceDown)
+                deltaPosition += upVector;
+            if(isShiftDown)
+                deltaPosition -= upVector;
+            deltaPosition *= Display::frameDeltaTime() * 1.5;
+            if(isFDown)
+                deltaPosition *= 5;
+            setViewPosition(getViewPosition() + deltaPosition);
         }
         running = false;
-        writerWaitCond.notify_all();
+        somethingToWrite.set();
         endGraphics();
     }
 };

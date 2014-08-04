@@ -92,7 +92,7 @@ class Server
         atomic_uint &connectionCount;
         flag &anyConnections;
         VariableSet variableSet;
-        PositionF viewPosition;
+        CachedVariable<PositionF> viewPosition;
         atomic_bool hasViewPosition;
         atomic_bool done;
         atomic_bool needKeepalive;
@@ -121,7 +121,7 @@ class Server
     void reader(shared_ptr<Connection> pconnection, shared_ptr<stream::Reader> preader)
     {
         Connection &connection = *pconnection;
-        connection.viewPosition = initialPositionF();
+        connection.viewPosition.write(initialPositionF());
         connection.hasViewPosition = true;
         NetworkEvent event;
         while(running && !connection.done)
@@ -148,6 +148,13 @@ class Server
                     lock_guard<mutex> lockIt(connection.requestedChunksLock);
                     connection.requestedChunks.insert(chunkPosition);
                     connection.eventWaitCond.notify_all();
+                    break;
+                }
+                case NetworkEventType::SendPlayerProperties:
+                {
+                    shared_ptr<stream::Reader> pEventReader = event.getReader();
+                    connection.viewPosition.write(stream::read<PositionF>(*pEventReader));
+                    connection.hasViewPosition = true;
                     break;
                 }
                 }
@@ -375,7 +382,7 @@ class Server
         uniform_int_distribution<int32_t> xzPositionDistribution(-16, 16), yPositionDistribution(32, 96), blockTypeDistribution(0, 3);
         while(running)
         {
-            for(size_t i = 0; i < 100; i++)
+            for(size_t i = 0; i < 1; i++)
             {
                 PositionI pos = PositionI(xzPositionDistribution(randomEngine), yPositionDistribution(randomEngine), xzPositionDistribution(randomEngine), Dimension::Overworld);
                 int32_t blockType = blockTypeDistribution(randomEngine);

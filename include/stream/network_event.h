@@ -10,7 +10,8 @@ enum class NetworkEventType : uint8_t
     SendNewChunk,
     SendBlockUpdate,
     RequestChunk,
-    DEFINE_ENUM_LIMITS(Keepalive, RequestChunk)
+    SendPlayerProperties,
+    DEFINE_ENUM_LIMITS(Keepalive, SendPlayerProperties)
 };
 
 class NetworkEvent final
