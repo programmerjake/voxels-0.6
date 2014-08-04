@@ -9,6 +9,7 @@
 #include "util/enum_traits.h"
 #include "util/linked_map.h"
 #include "util/cached_variable.h"
+#include "physics/physics.h"
 #include <functional>
 #include <algorithm>
 #include <mutex>
@@ -56,6 +57,8 @@ struct RenderObjectBlockDescriptor
     enum_array<bool, BlockFace> faceBlocked;
     BlockDrawClass blockDrawClass;
     RenderLayer renderLayer = RenderLayer::Opaque;
+    shared_ptr<PhysicsObjectConstructor> physicsObjectConstructor;
+    VectorF physicsObjectOffset;
     static bool needRenderFace(BlockFace face, shared_ptr<RenderObjectBlockDescriptor> block, shared_ptr<RenderObjectBlockDescriptor> sideBlock)
     {
         if(!block)
@@ -84,6 +87,8 @@ struct RenderObjectBlockDescriptor
         }
         retval->blockDrawClass = stream::read<BlockDrawClass>(reader);
         retval->renderLayer = stream::read<RenderLayer>(reader);
+        retval->physicsObjectConstructor = stream::read<PhysicsObjectConstructor>(reader, variableSet);
+        retval->physicsObjectOffset = stream::read<VectorF>(reader);
         return retval;
     }
     void write(stream::Writer &writer, VariableSet &variableSet) const
@@ -96,12 +101,19 @@ struct RenderObjectBlockDescriptor
         }
         stream::write<BlockDrawClass>(writer, blockDrawClass);
         stream::write<RenderLayer>(writer, renderLayer);
+        stream::write<PhysicsObjectConstructor>(writer, variableSet, physicsObjectConstructor);
+        stream::write<VectorF>(writer, physicsObjectOffset);
+    }
+    shared_ptr<PhysicsObject> createPhysicsObject(PositionI blockPosition, shared_ptr<PhysicsWorld> pWorld)
+    {
+        return physicsObjectConstructor->make((PositionF)blockPosition + physicsObjectOffset, VectorF(0), pWorld);
     }
 };
 
 struct RenderObjectBlock
 {
     shared_ptr<RenderObjectBlockDescriptor> descriptor;
+    shared_ptr<PhysicsObject> physicsObject;
     void draw(Mesh &dest, RenderLayer renderLayer, PositionI position, const RenderObjectBlock & nx, const RenderObjectBlock & px, const RenderObjectBlock & ny, const RenderObjectBlock & py, const RenderObjectBlock & nz, const RenderObjectBlock & pz)
     {
         if(descriptor == nullptr || descriptor->renderLayer != renderLayer)
@@ -135,6 +147,21 @@ struct RenderObjectBlock
     bool operator ~() const
     {
         return !descriptor;
+    }
+    void createPhysicsObject(shared_ptr<PhysicsWorld> pWorld, PositionI position)
+    {
+        if(physicsObject)
+            physicsObject->destroy();
+        if(descriptor)
+            physicsObject = descriptor->createPhysicsObject(position, pWorld);
+        else
+            physicsObject = nullptr;
+    }
+    void destroyPhysicsObject()
+    {
+        if(physicsObject)
+            physicsObject->destroy();
+        physicsObject = nullptr;
     }
 };
 
@@ -318,6 +345,48 @@ public:
     void write(stream::Writer &writer, VariableSet &variableSet)
     {
         blockChunk.write(writer, variableSet);
+    }
+    void createPhysicsObjects(shared_ptr<PhysicsWorld> pWorld, VectorI minPosition, VectorI maxPosition)
+    {
+        minPosition -= (VectorI)blockChunk.basePosition;
+        maxPosition -= (VectorI)blockChunk.basePosition;
+        if(minPosition.x < 0)
+            minPosition.x = 0;
+        if(minPosition.y < 0)
+            minPosition.y = 0;
+        if(minPosition.z < 0)
+            minPosition.z = 0;
+        if(maxPosition.x > BlockChunkType::chunkSizeX - 1)
+            maxPosition.x = BlockChunkType::chunkSizeX - 1;
+        if(maxPosition.y > BlockChunkType::chunkSizeY - 1)
+            maxPosition.y = BlockChunkType::chunkSizeY - 1;
+        if(maxPosition.z > BlockChunkType::chunkSizeZ - 1)
+            maxPosition.z = BlockChunkType::chunkSizeZ - 1;
+        for(int32_t x = minPosition.x; x <= maxPosition.x; x++)
+            for(int32_t y = minPosition.y; y <= maxPosition.y; y++)
+                for(int32_t z = minPosition.z; z <= maxPosition.z; z++)
+                    blockChunk.blocks[x][y][z].createPhysicsObject(pWorld, blockChunk.basePosition + VectorI(x, y, z));
+    }
+    void destroyPhysicsObjects(VectorI minPosition, VectorI maxPosition)
+    {
+        minPosition -= (VectorI)blockChunk.basePosition;
+        maxPosition -= (VectorI)blockChunk.basePosition;
+        if(minPosition.x < 0)
+            minPosition.x = 0;
+        if(minPosition.y < 0)
+            minPosition.y = 0;
+        if(minPosition.z < 0)
+            minPosition.z = 0;
+        if(maxPosition.x > BlockChunkType::chunkSizeX - 1)
+            maxPosition.x = BlockChunkType::chunkSizeX - 1;
+        if(maxPosition.y > BlockChunkType::chunkSizeY - 1)
+            maxPosition.y = BlockChunkType::chunkSizeY - 1;
+        if(maxPosition.z > BlockChunkType::chunkSizeZ - 1)
+            maxPosition.z = BlockChunkType::chunkSizeZ - 1;
+        for(int32_t x = minPosition.x; x <= maxPosition.x; x++)
+            for(int32_t y = minPosition.y; y <= maxPosition.y; y++)
+                for(int32_t z = minPosition.z; z <= maxPosition.z; z++)
+                    blockChunk.blocks[x][y][z].destroyPhysicsObject();
     }
 };
 
@@ -519,6 +588,42 @@ public:
         invalidateChunkMeshesAll(chunkPosition + VectorI(0, RenderObjectChunk::BlockChunkType::chunkSizeY, 0));
         invalidateChunkMeshesAll(chunkPosition - VectorI(0, 0, RenderObjectChunk::BlockChunkType::chunkSizeZ));
         invalidateChunkMeshesAll(chunkPosition + VectorI(0, 0, RenderObjectChunk::BlockChunkType::chunkSizeZ));
+    }
+    void createPhysicsObjects(shared_ptr<PhysicsWorld> pWorld, PositionI center, VectorI extents)
+    {
+        PositionI minPos = center - extents;
+        PositionI maxPos = center + extents;
+        PositionI beginChunkPos = RenderObjectChunk::BlockChunkType::getChunkBasePosition(minPos);
+        PositionI endChunkPos = RenderObjectChunk::BlockChunkType::getChunkBasePosition(maxPos + VectorI(RenderObjectChunk::BlockChunkType::chunkSizeX, RenderObjectChunk::BlockChunkType::chunkSizeY, RenderObjectChunk::BlockChunkType::chunkSizeZ));
+        for(PositionI pos = beginChunkPos; pos.x < endChunkPos.x; pos.x += RenderObjectChunk::BlockChunkType::chunkSizeX)
+        {
+            for(pos.y = beginChunkPos.y; pos.y < endChunkPos.y; pos.y += RenderObjectChunk::BlockChunkType::chunkSizeY)
+            {
+                for(pos.z = beginChunkPos.z; pos.z < endChunkPos.z; pos.z += RenderObjectChunk::BlockChunkType::chunkSizeZ)
+                {
+                    shared_ptr<RenderObjectChunk> chunk = getChunk(pos);
+                    chunk->createPhysicsObjects(pWorld, (VectorI)minPos, (VectorI)maxPos);
+                }
+            }
+        }
+    }
+    void destroyPhysicsObjects(PositionI center, VectorI extents)
+    {
+        PositionI minPos = center - extents;
+        PositionI maxPos = center + extents;
+        PositionI beginChunkPos = RenderObjectChunk::BlockChunkType::getChunkBasePosition(minPos);
+        PositionI endChunkPos = RenderObjectChunk::BlockChunkType::getChunkBasePosition(maxPos + VectorI(RenderObjectChunk::BlockChunkType::chunkSizeX, RenderObjectChunk::BlockChunkType::chunkSizeY, RenderObjectChunk::BlockChunkType::chunkSizeZ));
+        for(PositionI pos = beginChunkPos; pos.x < endChunkPos.x; pos.x += RenderObjectChunk::BlockChunkType::chunkSizeX)
+        {
+            for(pos.y = beginChunkPos.y; pos.y < endChunkPos.y; pos.y += RenderObjectChunk::BlockChunkType::chunkSizeY)
+            {
+                for(pos.z = beginChunkPos.z; pos.z < endChunkPos.z; pos.z += RenderObjectChunk::BlockChunkType::chunkSizeZ)
+                {
+                    shared_ptr<RenderObjectChunk> chunk = getChunk(pos);
+                    chunk->destroyPhysicsObjects((VectorI)minPos, (VectorI)maxPos);
+                }
+            }
+        }
     }
 };
 

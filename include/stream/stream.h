@@ -539,7 +539,7 @@ struct rw_class_traits_helper_has_read_with_VariableSet<T, true>
     typedef decltype(T::read(rw_class_traits_helper::readerRef(), rw_class_traits_helper::variableSetRef())) value_type;
 };
 
-template <typename T, bool = std::is_class<T>::value>
+template <typename T, bool = std::is_class<T>::value && !std::is_abstract<T>::value>
 struct rw_class_traits_helper_has_read_without_VariableSet_helper;
 template <typename T>
 class rw_class_traits_helper_has_read_without_VariableSet_helper<T, true>

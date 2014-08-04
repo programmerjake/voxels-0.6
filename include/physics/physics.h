@@ -338,6 +338,7 @@ public:
             return empty();
         }
         assert(false);
+        return nullptr;
     }
 };
 
