@@ -1123,6 +1123,30 @@ void freeDisplayList(GLuint displayList)
     lock_guard<mutex> lockGuard(freeDisplayListsLock);
     freeDisplayLists.push_back(displayList);
 }
+#if 0
+vector<GLuint> freeBuffers;
+mutex freeBuffersLock;
+GLuint allocateBuffer()
+{
+    freeBuffersLock.lock();
+    if(freeBuffers.empty())
+    {
+        freeBuffersLock.unlock();
+        return glGenBuffersARB(1);
+    }
+    GLuint retval = freeBuffers.back();
+    freeBuffers.pop_back();
+    freeBuffersLock.unlock();
+    return retval;
+}
+void freeBuffer(GLuint displayList)
+{
+    lock_guard<mutex> lockGuard(freeBuffersLock);
+    freeBuffers.push_back(displayList);
+}
+#else
+#warning add OpenGL Buffers to CachedMeshData
+#endif
 struct CachedMeshData
 {
     GLuint displayList;
