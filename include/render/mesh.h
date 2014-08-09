@@ -77,7 +77,7 @@ struct TransformedMeshRef
 {
     Matrix tform;
     const Mesh &mesh;
-    TransformedMesh(Matrix tform, const Mesh &mesh)
+    TransformedMeshRef(Matrix tform, const Mesh &mesh)
         : tform(tform), mesh(mesh)
     {
     }
@@ -90,7 +90,7 @@ struct ColorizedMeshRef
 {
     ColorF color;
     const Mesh &mesh;
-    ColorizedMesh(ColorF color, const Mesh &mesh)
+    ColorizedMeshRef(ColorF color, const Mesh &mesh)
         : color(color), mesh(mesh)
     {
     }
@@ -104,7 +104,7 @@ struct ColorizedTransformedMeshRef
     ColorF color;
     Matrix tform;
     const Mesh &mesh;
-    ColorizedTransformedMesh(ColorF color, Matrix tform, const Mesh &mesh)
+    ColorizedTransformedMeshRef(ColorF color, Matrix tform, const Mesh &mesh)
         : color(color), tform(tform), mesh(mesh)
     {
     }

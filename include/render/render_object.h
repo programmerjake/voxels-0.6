@@ -121,7 +121,34 @@ struct RenderObjectEntityDescriptor
 {
     vector<RenderObjectEntityPart> parts;
     shared_ptr<PhysicsObjectConstructor> physicsObjectConstructor;
-#warning finish
+    static shared_ptr<RenderObjectEntityDescriptor> read(stream::Reader &reader, VariableSet &variableSet)
+    {
+        size_t partCount = (size_t)(uint8_t)stream::read<uint8_t>(reader);
+        shared_ptr<RenderObjectEntityDescriptor> retval = make_shared<RenderObjectEntityDescriptor>();
+        RenderObjectEntityDescriptor & descriptor = *retval;
+        descriptor.parts.resize(partCount);
+        for(size_t i = 0; i < partCount; i++)
+        {
+            descriptor.parts[i].mesh = std::move(*stream::read_nonnull<Mesh>(reader, variableSet));
+            descriptor.parts[i].script = stream::read<Script>(reader, variableSet);
+            descriptor.parts[i].renderLayer = stream::read<RenderLayer>(reader);
+        }
+        descriptor.physicsObjectConstructor = stream::read_nonnull<PhysicsObjectConstructor>(reader, variableSet);
+        return retval;
+    }
+    void write(stream::Writer &writer, VariableSet &variableSet)
+    {
+        uint8_t partCount = parts.size();
+        assert((size_t)partCount == parts.size());
+        stream::write<uint8_t>(writer, partCount);
+        for(const RenderObjectEntityPart &part : parts)
+        {
+            stream::write<Mesh>(writer, variableSet, part.mesh);
+            stream::write<Script>(writer, variableSet, part.script);
+            stream::write<RenderLayer>(writer, part.renderLayer);
+        }
+        stream::write<PhysicsObjectConstructor>(writer, variableSet, physicsObjectConstructor);
+    }
 };
 
 struct RenderObjectEntity
@@ -130,8 +157,23 @@ struct RenderObjectEntity
     shared_ptr<Scripting::DataObject> ioObject;
     PositionF position;
     VectorF velocity;
+    shared_ptr<PhysicsObject> physicsObject;
 #warning finish
 };
+
+namespace stream
+{
+template <>
+struct is_value_changed<RenderObjectEntity>
+{
+    bool operator ()(std::shared_ptr<const RenderObjectEntity> value, VariableSet &) const
+    {
+        if(value == nullptr)
+            return false;
+        return true;
+    }
+};
+}
 
 struct RenderObjectBlock
 {

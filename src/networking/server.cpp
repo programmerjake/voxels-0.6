@@ -288,7 +288,7 @@ class Server
             {
                 for(int32_t z = chunkPosition.z; z < chunkPosition.z + RenderObjectChunk::BlockChunkType::chunkSizeZ; z++)
                 {
-                    int32_t landHeight = (int32_t)(64 + 16 * (sin((float)x / 3) * sin((float)z / 3)));
+                    int32_t landHeight = (int32_t)(64 + 4 * (sin((float)x / 3) * sin((float)z / 3)));
                     for(int32_t y = chunkPosition.y; y < chunkPosition.y + RenderObjectChunk::BlockChunkType::chunkSizeY; y++)
                     {
                         if(y < landHeight)

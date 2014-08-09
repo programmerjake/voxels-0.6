@@ -821,6 +821,17 @@ struct write<T, typename std::enable_if<std::is_enum<T>::value>::type>
     }
 };
 
+template <typename T>
+struct read_nonnull : public read_base<shared_ptr<T>>
+{
+    read_nonnull(Reader &reader, VariableSet &variableSet)
+        : read_base<shared_ptr<T>>(read<T>(reader, variableSet))
+    {
+        if(value == nullptr)
+            throw InvalidDataValueException("read null pointer in read_nonnull");
+    }
+};
+
 class FileReader final : public Reader
 {
 private:
