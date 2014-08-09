@@ -59,6 +59,10 @@ class Client
         positionChanged = true;
         somethingToWrite.set();
     }
+    int32_t getViewDistance()
+    {
+        return 32;
+    }
     void reader(shared_ptr<stream::Reader> preader)
     {
         try
@@ -360,7 +364,7 @@ public:
             for(RenderLayer renderLayer : enum_traits<RenderLayer>())
             {
                 r << renderLayer;
-                world->draw(r, inverse(tform), renderLayer, (PositionI)getViewPosition(), 50, [&](Mesh m, PositionI chunkBasePosition)->Mesh
+                world->draw(r, inverse(tform), renderLayer, (PositionI)getViewPosition(), getViewDistance(), [&](Mesh m, PositionI chunkBasePosition)->Mesh
                 {
                     return lightMesh(m, lightVertex);
                 }, false, [&](PositionI chunkPos)

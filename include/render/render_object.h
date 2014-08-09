@@ -110,6 +110,29 @@ struct RenderObjectBlockDescriptor
     }
 };
 
+struct RenderObjectEntityPart
+{
+    Mesh mesh;
+    shared_ptr<Script> script;
+    RenderLayer renderLayer;
+};
+
+struct RenderObjectEntityDescriptor
+{
+    vector<RenderObjectEntityPart> parts;
+    shared_ptr<PhysicsObjectConstructor> physicsObjectConstructor;
+#warning finish
+};
+
+struct RenderObjectEntity
+{
+    shared_ptr<RenderObjectEntity> descriptor;
+    shared_ptr<Scripting::DataObject> ioObject;
+    PositionF position;
+    VectorF velocity;
+#warning finish
+};
+
 struct RenderObjectBlock
 {
     shared_ptr<RenderObjectBlockDescriptor> descriptor;

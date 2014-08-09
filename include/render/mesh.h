@@ -73,6 +73,46 @@ struct ColorizedTransformedMesh
     operator shared_ptr<Mesh>() const;
 };
 
+struct TransformedMeshRef
+{
+    Matrix tform;
+    const Mesh &mesh;
+    TransformedMesh(Matrix tform, const Mesh &mesh)
+        : tform(tform), mesh(mesh)
+    {
+    }
+    operator Mesh() const;
+    operator shared_ptr<Mesh>() const;
+    operator TransformedMesh() const;
+};
+
+struct ColorizedMeshRef
+{
+    ColorF color;
+    const Mesh &mesh;
+    ColorizedMesh(ColorF color, const Mesh &mesh)
+        : color(color), mesh(mesh)
+    {
+    }
+    operator Mesh() const;
+    operator shared_ptr<Mesh>() const;
+    operator ColorizedMesh() const;
+};
+
+struct ColorizedTransformedMeshRef
+{
+    ColorF color;
+    Matrix tform;
+    const Mesh &mesh;
+    ColorizedTransformedMesh(ColorF color, Matrix tform, const Mesh &mesh)
+        : color(color), tform(tform), mesh(mesh)
+    {
+    }
+    operator Mesh() const;
+    operator shared_ptr<Mesh>() const;
+    operator ColorizedTransformedMesh() const;
+};
+
 struct Mesh
 {
     vector<Triangle> triangles;
@@ -126,6 +166,18 @@ struct Mesh
     }
     Mesh(ColorizedTransformedMesh mesh)
         : Mesh(*mesh.mesh, mesh.color, mesh.tform)
+    {
+    }
+    Mesh(TransformedMeshRef mesh)
+        : Mesh(mesh.mesh, mesh.tform)
+    {
+    }
+    Mesh(ColorizedMeshRef mesh)
+        : Mesh(mesh.mesh, mesh.color)
+    {
+    }
+    Mesh(ColorizedTransformedMeshRef mesh)
+        : Mesh(mesh.mesh, mesh.color, mesh.tform)
     {
     }
     void append(const Mesh & rt)
@@ -188,6 +240,18 @@ struct Mesh
     {
         append(*mesh.mesh, mesh.color, mesh.tform);
     }
+    void append(TransformedMeshRef mesh)
+    {
+        append(mesh.mesh, mesh.tform);
+    }
+    void append(ColorizedMeshRef mesh)
+    {
+        append(mesh.mesh, mesh.color);
+    }
+    void append(ColorizedTransformedMeshRef mesh)
+    {
+        append(mesh.mesh, mesh.color, mesh.tform);
+    }
     void clear()
     {
         triangles.clear();
@@ -248,9 +312,54 @@ inline ColorizedTransformedMesh::operator shared_ptr<Mesh>() const
     return shared_ptr<Mesh>(new Mesh(*this));
 }
 
-inline TransformedMesh transform(Matrix tform, Mesh mesh)
+inline TransformedMeshRef::operator Mesh() const
 {
-    return TransformedMesh(tform, make_shared<Mesh>(std::move(mesh)));
+    return Mesh(*this);
+}
+
+inline TransformedMeshRef::operator shared_ptr<Mesh>() const
+{
+    return shared_ptr<Mesh>(new Mesh(*this));
+}
+
+inline TransformedMeshRef::operator TransformedMesh() const
+{
+    return TransformedMesh(tform, shared_ptr<Mesh>(new Mesh(mesh)));
+}
+
+inline ColorizedMeshRef::operator Mesh() const
+{
+    return Mesh(*this);
+}
+
+inline ColorizedMeshRef::operator shared_ptr<Mesh>() const
+{
+    return shared_ptr<Mesh>(new Mesh(*this));
+}
+
+inline ColorizedMeshRef::operator ColorizedMesh() const
+{
+    return ColorizedMesh(color, shared_ptr<Mesh>(new Mesh(mesh)));
+}
+
+inline ColorizedTransformedMeshRef::operator Mesh() const
+{
+    return Mesh(*this);
+}
+
+inline ColorizedTransformedMeshRef::operator shared_ptr<Mesh>() const
+{
+    return shared_ptr<Mesh>(new Mesh(*this));
+}
+
+inline ColorizedTransformedMeshRef::operator ColorizedTransformedMesh() const
+{
+    return ColorizedTransformedMesh(color, tform, shared_ptr<Mesh>(new Mesh(mesh)));
+}
+
+inline TransformedMeshRef transform(Matrix tform, const Mesh &mesh)
+{
+    return TransformedMeshRef(tform, mesh);
 }
 
 inline TransformedMesh transform(Matrix tform, shared_ptr<Mesh> mesh)
@@ -264,9 +373,19 @@ inline TransformedMesh transform(Matrix tform, TransformedMesh mesh)
     return TransformedMesh(transform(tform, mesh.tform), mesh.mesh);
 }
 
+inline TransformedMeshRef transform(Matrix tform, const TransformedMeshRef &mesh)
+{
+    return TransformedMeshRef(transform(tform, mesh.tform), mesh.mesh);
+}
+
 inline ColorizedTransformedMesh transform(Matrix tform, ColorizedMesh mesh)
 {
     return ColorizedTransformedMesh(mesh.color, tform, mesh.mesh);
+}
+
+inline ColorizedTransformedMeshRef transform(Matrix tform, const ColorizedMeshRef &mesh)
+{
+    return ColorizedTransformedMeshRef(mesh.color, tform, mesh.mesh);
 }
 
 inline ColorizedTransformedMesh transform(Matrix tform, ColorizedTransformedMesh mesh)
@@ -274,9 +393,14 @@ inline ColorizedTransformedMesh transform(Matrix tform, ColorizedTransformedMesh
     return ColorizedTransformedMesh(mesh.color, transform(tform, mesh.tform), mesh.mesh);
 }
 
-inline ColorizedMesh colorize(ColorF color, Mesh mesh)
+inline ColorizedTransformedMeshRef transform(Matrix tform, const ColorizedTransformedMeshRef &mesh)
 {
-    return ColorizedMesh(color, make_shared<Mesh>(std::move(mesh)));
+    return ColorizedTransformedMeshRef(mesh.color, transform(tform, mesh.tform), mesh.mesh);
+}
+
+inline ColorizedMeshRef colorize(ColorF color, const Mesh &mesh)
+{
+    return ColorizedMeshRef(color, mesh);
 }
 
 inline ColorizedMesh colorize(ColorF color, shared_ptr<Mesh> mesh)
@@ -290,14 +414,29 @@ inline ColorizedMesh colorize(ColorF color, ColorizedMesh mesh)
     return ColorizedMesh(colorize(color, mesh.color), mesh.mesh);
 }
 
+inline ColorizedMeshRef colorize(ColorF color, const ColorizedMeshRef &mesh)
+{
+    return ColorizedMeshRef(colorize(color, mesh.color), mesh.mesh);
+}
+
 inline ColorizedTransformedMesh colorize(ColorF color, TransformedMesh mesh)
 {
     return ColorizedTransformedMesh(color, mesh.tform, mesh.mesh);
 }
 
+inline ColorizedTransformedMeshRef colorize(ColorF color, const TransformedMeshRef &mesh)
+{
+    return ColorizedTransformedMeshRef(color, mesh.tform, mesh.mesh);
+}
+
 inline ColorizedTransformedMesh colorize(ColorF color, ColorizedTransformedMesh mesh)
 {
     return ColorizedTransformedMesh(colorize(color, mesh.color), mesh.tform, mesh.mesh);
+}
+
+inline ColorizedTransformedMeshRef colorize(ColorF color, const ColorizedTransformedMeshRef &mesh)
+{
+    return ColorizedTransformedMeshRef(colorize(color, mesh.color), mesh.tform, mesh.mesh);
 }
 
 #endif // MESH_H_INCLUDED
