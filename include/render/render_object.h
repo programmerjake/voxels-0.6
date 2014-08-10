@@ -112,7 +112,7 @@ struct RenderObjectBlockDescriptor
 
 struct RenderObjectEntityPart
 {
-    Mesh mesh;
+    shared_ptr<Mesh> mesh;
     shared_ptr<Script> script;
     RenderLayer renderLayer;
 };
@@ -129,8 +129,8 @@ struct RenderObjectEntityDescriptor
         descriptor.parts.resize(partCount);
         for(size_t i = 0; i < partCount; i++)
         {
-            descriptor.parts[i].mesh = std::move(*stream::read_nonnull<Mesh>(reader, variableSet));
-            descriptor.parts[i].script = stream::read<Script>(reader, variableSet);
+            descriptor.parts[i].mesh = stream::read_nonnull<Mesh>(reader, variableSet);
+            descriptor.parts[i].script = stream::read_nonnull<Script>(reader, variableSet);
             descriptor.parts[i].renderLayer = stream::read<RenderLayer>(reader);
         }
         descriptor.physicsObjectConstructor = stream::read_nonnull<PhysicsObjectConstructor>(reader, variableSet);
@@ -149,16 +149,50 @@ struct RenderObjectEntityDescriptor
         }
         stream::write<PhysicsObjectConstructor>(writer, variableSet, physicsObjectConstructor);
     }
+    void draw(Mesh &dest, RenderLayer renderLayer, PositionF position, VectorF velocity, float age, shared_ptr<Scripting::DataObject> ioObject)
+    {
+        for(RenderObjectEntityPart &part : parts)
+        {
+            if(part.renderLayer != renderLayer)
+                continue;
+            runEntityPartScript(dest, *part.mesh, part.script, position, velocity, age, ioObject);
+        }
+    }
 };
 
 struct RenderObjectEntity
 {
-    shared_ptr<RenderObjectEntity> descriptor;
+    shared_ptr<RenderObjectEntityDescriptor> descriptor;
     shared_ptr<Scripting::DataObject> ioObject;
     PositionF position;
     VectorF velocity;
+    float age = 0;
     shared_ptr<PhysicsObject> physicsObject;
-#warning finish
+    static shared_ptr<RenderObjectEntity> read(stream::Reader &reader, VariableSet &variableSet)
+    {
+        shared_ptr<RenderObjectEntity> retval = make_shared<RenderObjectEntity>();
+        retval->descriptor = stream::read<RenderObjectEntityDescriptor>(reader, variableSet);
+        retval->position = stream::read<PositionF>(reader);
+        retval->velocity = stream::read<VectorF>(reader);
+        retval->age = stream::read_finite<float32_t>(reader);
+        retval->physicsObject = nullptr;
+#warning add read/write ioObject
+        return retval;
+    }
+    void write(stream::Writer &writer, VariableSet &variableSet)
+    {
+        stream::write<RenderObjectEntityDescriptor>(writer, variableSet, descriptor);
+        stream::write<PositionF>(writer, position);
+        stream::write<VectorF>(writer, velocity);
+        stream::write<float32_t>(writer, age);
+    }
+    void draw(Mesh &dest, RenderLayer renderLayer, Dimension dimension)
+    {
+        if(dimension == position.d)
+        {
+            descriptor->draw(dest, renderLayer, position, velocity, age, ioObject);
+        }
+    }
 };
 
 namespace stream
@@ -475,6 +509,8 @@ class RenderObjectWorld
     typedef linked_map<PositionI, shared_ptr<RenderObjectChunk>> ChunksMap;
     ChunksMap chunks;
     mutex chunksLock;
+    list<shared_ptr<RenderObjectEntity>> entities;
+    mutex entitiesLock;
 public:
     shared_ptr<RenderObjectChunk> getChunk(PositionI pos)
     {
@@ -551,6 +587,20 @@ public:
                 }
             }
         }
+        vector<shared_ptr<RenderObjectEntity>> entitiesList;
+        {
+            lock_guard<mutex> lockIt(entitiesLock);
+            entitiesList.reserve(entities.size());
+            for(auto v : entities)
+                entitiesList.push_back(v);
+        }
+        Mesh drawMesh;
+        for(shared_ptr<RenderObjectEntity> entity : entitiesList)
+        {
+            entity->draw(drawMesh, renderLayer, pos.d);
+        }
+        drawMesh = filterFn(std::move(drawMesh), PositionI(0, 0, 0, pos.d));
+        renderer << transform(tform, drawMesh);
     }
 private:
     void invalidateChunkMeshes(PositionI position)
@@ -619,6 +669,12 @@ public:
             }
             retval->chunks[chunk->blockChunk.basePosition] = chunk;
         }
+        uint32_t entityCount = stream::read<uint32_t>(reader);
+        for(uint32_t i = 0; i < entityCount; i++)
+        {
+            shared_ptr<RenderObjectEntity> entity = stream::read_nonnull<RenderObjectEntity>(reader, variableSet);
+            retval->entities.push_back(entity);
+        }
         cout << "Reading World ... Done." << endl;
         return retval;
     }
@@ -630,6 +686,13 @@ public:
         for(auto iter = chunks.begin(); iter != chunks.end(); iter++)
         {
             stream::write<RenderObjectChunk>(writer, variableSet, std::get<1>(*iter));
+        }
+        uint32_t entityCount = (uint32_t)entities.size();
+        assert((size_t)entityCount == entities.size());
+        stream::write<uint32_t>(writer, entityCount);
+        for(shared_ptr<RenderObjectEntity> & e : entities)
+        {
+            stream::write<RenderObjectEntity>(writer, variableSet, e);
         }
         changeTracker.onWrite(variableSet);
     }

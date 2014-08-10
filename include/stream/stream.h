@@ -825,9 +825,9 @@ template <typename T>
 struct read_nonnull : public read_base<shared_ptr<T>>
 {
     read_nonnull(Reader &reader, VariableSet &variableSet)
-        : read_base<shared_ptr<T>>(read<T>(reader, variableSet))
+        : read_base<shared_ptr<T>>((shared_ptr<T>)read<T>(reader, variableSet))
     {
-        if(value == nullptr)
+        if(this->value == nullptr)
             throw InvalidDataValueException("read null pointer in read_nonnull");
     }
 };
@@ -927,8 +927,8 @@ public:
     {
     }
     template <size_t length>
-    explicit MemoryReader(const uint8_t a[length])
-        : MemoryReader(shared_ptr<const uint8_t>(&a[0], [](const uint8_t *){}))
+    explicit MemoryReader(const uint8_t (&a)[length])
+        : MemoryReader(shared_ptr<const uint8_t>(&a[0], [](const uint8_t *){}), length)
     {
     }
     virtual bool dataAvailable() override

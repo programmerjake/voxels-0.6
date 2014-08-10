@@ -51,6 +51,7 @@
 			<Add library="ogg" />
 			<Add library="vorbis" />
 			<Add library="vorbisfile" />
+			<Add library="z" />
 		</Linker>
 		<Unit filename="include/decoder/ogg_vorbis_decoder.h" />
 		<Unit filename="include/decoder/png_decoder.h" />

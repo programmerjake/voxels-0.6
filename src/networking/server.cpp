@@ -45,6 +45,50 @@ shared_ptr<RenderObjectBlockDescriptor> getDirt()
     return retval;
 }
 
+shared_ptr<RenderObjectBlockDescriptor> getGrass(ColorF grassColor = RGBF(0.25, 1, 0.25))
+{
+    static shared_ptr<RenderObjectBlockDescriptor> retval;
+    if(retval)
+        return retval;
+    retval = make_shared<RenderObjectBlockDescriptor>();
+    retval->center = make_shared<Mesh>();
+    {
+        TextureDescriptor nx = TextureAtlas::DirtMask.td();
+        TextureDescriptor px = TextureAtlas::DirtMask.td();
+        TextureDescriptor ny = TextureAtlas::Dirt.td();
+        TextureDescriptor py = TextureDescriptor();
+        TextureDescriptor nz = TextureAtlas::DirtMask.td();
+        TextureDescriptor pz = TextureAtlas::DirtMask.td();
+        retval->faceMesh[BlockFace::NX] = make_shared<Mesh>(Generate::unitBox(nx, TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()));
+        retval->faceMesh[BlockFace::PX] = make_shared<Mesh>(Generate::unitBox(TextureDescriptor(), px, TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor()));
+        retval->faceMesh[BlockFace::NY] = make_shared<Mesh>(Generate::unitBox(TextureDescriptor(), TextureDescriptor(), ny, TextureDescriptor(), TextureDescriptor(), TextureDescriptor()));
+        retval->faceMesh[BlockFace::PY] = make_shared<Mesh>(Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), py, TextureDescriptor(), TextureDescriptor()));
+        retval->faceMesh[BlockFace::NZ] = make_shared<Mesh>(Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), nz, TextureDescriptor()));
+        retval->faceMesh[BlockFace::PZ] = make_shared<Mesh>(Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), pz));
+    }
+    {
+        TextureDescriptor nx = TextureAtlas::GrassMask.td();
+        TextureDescriptor px = TextureAtlas::GrassMask.td();
+        TextureDescriptor ny = TextureDescriptor();
+        TextureDescriptor py = TextureAtlas::GrassTop.td();
+        TextureDescriptor nz = TextureAtlas::GrassMask.td();
+        TextureDescriptor pz = TextureAtlas::GrassMask.td();
+        retval->faceMesh[BlockFace::NX]->append(colorize(grassColor, Generate::unitBox(nx, TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor())));
+        retval->faceMesh[BlockFace::PX]->append(colorize(grassColor, Generate::unitBox(TextureDescriptor(), px, TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor())));
+        retval->faceMesh[BlockFace::NY]->append(colorize(grassColor, Generate::unitBox(TextureDescriptor(), TextureDescriptor(), ny, TextureDescriptor(), TextureDescriptor(), TextureDescriptor())));
+        retval->faceMesh[BlockFace::PY]->append(colorize(grassColor, Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), py, TextureDescriptor(), TextureDescriptor())));
+        retval->faceMesh[BlockFace::NZ]->append(colorize(grassColor, Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), nz, TextureDescriptor())));
+        retval->faceMesh[BlockFace::PZ]->append(colorize(grassColor, Generate::unitBox(TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), TextureDescriptor(), pz)));
+    }
+    for(BlockFace face : enum_traits<BlockFace>())
+    {
+        retval->faceBlocked[face] = true;
+    }
+    retval->blockDrawClass = 0;
+    retval->renderLayer = RenderLayer::Opaque;
+    return retval;
+}
+
 shared_ptr<RenderObjectBlockDescriptor> getGlass()
 {
     static shared_ptr<RenderObjectBlockDescriptor> retval;
@@ -291,17 +335,17 @@ class Server
                     int32_t landHeight = (int32_t)(64 + 4 * (sin((float)x / 3) * sin((float)z / 3)));
                     for(int32_t y = chunkPosition.y; y < chunkPosition.y + RenderObjectChunk::BlockChunkType::chunkSizeY; y++)
                     {
-                        if(y < landHeight)
+                        if(y < landHeight - 5)
                         {
                             blockChunk.blocks[x - chunkPosition.x][y - chunkPosition.y][z - chunkPosition.z] = getStone();
                         }
-                        else if(y <= landHeight)
+                        else if(y < landHeight)
                         {
                             blockChunk.blocks[x - chunkPosition.x][y - chunkPosition.y][z - chunkPosition.z] = getDirt();
                         }
-                        else if(y == landHeight + 1)
+                        else if(y <= landHeight)
                         {
-                            blockChunk.blocks[x - chunkPosition.x][y - chunkPosition.y][z - chunkPosition.z] = getGlass();
+                            blockChunk.blocks[x - chunkPosition.x][y - chunkPosition.y][z - chunkPosition.z] = getGrass();
                         }
                         else
                         {

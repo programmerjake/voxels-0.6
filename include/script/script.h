@@ -562,6 +562,8 @@ public:
     shared_ptr<Scripting::Data> evaluate(shared_ptr<Scripting::DataObject> inputObject = make_shared<Scripting::DataObject>()) const
     {
         Scripting::State state(nodes);
+        if(inputObject == nullptr)
+            inputObject = make_shared<Scripting::DataObject>();
         state.variables->value[L"io"] = inputObject;
         return nodes.back()->evaluate(state);
     }

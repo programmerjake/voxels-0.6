@@ -279,6 +279,8 @@ void endGraphics()
     }
 }
 
+static void getExtensions();
+
 void startGraphics()
 {
     if(runningGraphics.exchange(true))
@@ -325,7 +327,7 @@ void startGraphics()
     SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    window = SDL_CreateWindow("Voxels", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, xResInternal, yResInternal, SDL_WINDOW_OPENGL);
+    window = SDL_CreateWindow("Voxels", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, xResInternal, yResInternal, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     if(window == nullptr)
     {
         cerr << "error : can't create window : " << SDL_GetError();
@@ -338,6 +340,7 @@ void startGraphics()
         exit(1);
     }
     SDL_SetHint(SDL_HINT_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK, "1");
+    getExtensions();
 }
 
 static volatile double lastFlipTime = 0;
@@ -810,6 +813,8 @@ static Event *makeEvent()
         case SDL_JOYBUTTONUP:
             //TODO (jacob#): handle joysticks
             break;
+        case SDL_WINDOWEVENT_RESIZED:
+            break;
         case SDL_QUIT:
             return new QuitEvent();
         case SDL_SYSWMEVENT:
@@ -981,6 +986,7 @@ float Display::scaleY()
 
 void Display::initFrame()
 {
+    SDL_GetWindowSize(window, &xResInternal, &yResInternal);
     if(width() > height())
     {
         scaleXInternal = static_cast<float>(width()) / height();
@@ -1007,7 +1013,7 @@ void Display::initFrame()
     glViewport(0, 0, width(), height());
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    const float minDistance = 5e-2f, maxDistance = 100.0f;
+    const float minDistance = 5e-2f, maxDistance = 200.0f;
     glFrustum(-minDistance * scaleX(), minDistance * scaleX(), -minDistance * scaleY(), minDistance * scaleY(), minDistance, maxDistance);
     glEnableClientState(GL_COLOR_ARRAY);
     glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -1103,6 +1109,19 @@ void Display::clear(ColorF color)
 namespace
 {
 
+struct CachedMeshData
+{
+    Image image;
+    CachedMeshData(const Image & image)
+        : image(image)
+    {
+    }
+    virtual ~CachedMeshData()
+    {
+    }
+    virtual void render(Matrix tform, bool enableDepthBuffer) = 0;
+};
+
 vector<GLuint> freeDisplayLists;
 mutex freeDisplayListsLock;
 GLuint allocateDisplayList()
@@ -1123,16 +1142,65 @@ void freeDisplayList(GLuint displayList)
     lock_guard<mutex> lockGuard(freeDisplayListsLock);
     freeDisplayLists.push_back(displayList);
 }
-#if 0
+struct CachedMeshDataDisplayList : public CachedMeshData
+{
+    GLuint displayList;
+    CachedMeshDataDisplayList(const Mesh & mesh)
+        : CachedMeshData(mesh.image), displayList(allocateDisplayList())
+    {
+        glNewList(displayList, GL_COMPILE);
+        renderInternal(mesh);
+        glEndList();
+    }
+    virtual ~CachedMeshDataDisplayList()
+    {
+        freeDisplayList(displayList);
+    }
+    virtual void render(Matrix tform, bool enableDepthBuffer) override
+    {
+        image.bind();
+        glDepthMask(enableDepthBuffer ? GL_TRUE : GL_FALSE);
+        glMatrixMode(GL_MODELVIEW);
+        glLoadMatrix(tform);
+        glCallList(displayList);
+        glLoadIdentity();
+    }
+};
+
+PFNGLBINDBUFFERARBPROC fnGLBindBufferARB = nullptr;
+PFNGLDELETEBUFFERSARBPROC fnGLDeleteBuffersARB = nullptr;
+PFNGLGENBUFFERSARBPROC fnGLGenBuffersARB = nullptr;
+PFNGLBUFFERDATAARBPROC fnGLBufferDataARB = nullptr;
+PFNGLMAPBUFFERARBPROC fnGLMapBufferARB = nullptr;
+PFNGLUNMAPBUFFERARBPROC fnGLUnmapBufferARB = nullptr;
+bool haveOpenGLBuffers = false;
+
+void getOpenGLBuffersExtension()
+{
+    haveOpenGLBuffers = SDL_GL_ExtensionSupported("GL_ARB_vertex_buffer_object");
+    if(haveOpenGLBuffers)
+    {
+        fnGLBindBufferARB = (PFNGLBINDBUFFERARBPROC)SDL_GL_GetProcAddress("glBindBufferARB");
+        fnGLDeleteBuffersARB = (PFNGLDELETEBUFFERSARBPROC)SDL_GL_GetProcAddress("glDeleteBuffersARB");
+        fnGLGenBuffersARB = (PFNGLGENBUFFERSARBPROC)SDL_GL_GetProcAddress("glGenBuffersARB");
+        fnGLBufferDataARB = (PFNGLBUFFERDATAARBPROC)SDL_GL_GetProcAddress("glBufferDataARB");
+        fnGLMapBufferARB = (PFNGLMAPBUFFERARBPROC)SDL_GL_GetProcAddress("glMapBufferARB");
+        fnGLUnmapBufferARB = (PFNGLUNMAPBUFFERARBPROC)SDL_GL_GetProcAddress("glUnmapBufferARB");
+    }
+}
+
 vector<GLuint> freeBuffers;
 mutex freeBuffersLock;
 GLuint allocateBuffer()
 {
+    assert(haveOpenGLBuffers);
     freeBuffersLock.lock();
     if(freeBuffers.empty())
     {
         freeBuffersLock.unlock();
-        return glGenBuffersARB(1);
+        GLuint retval;
+        fnGLGenBuffersARB(1, &retval);
+        return retval;
     }
     GLuint retval = freeBuffers.back();
     freeBuffers.pop_back();
@@ -1144,34 +1212,88 @@ void freeBuffer(GLuint displayList)
     lock_guard<mutex> lockGuard(freeBuffersLock);
     freeBuffers.push_back(displayList);
 }
-#else
-#warning add OpenGL Buffers to CachedMeshData
-#endif
-struct CachedMeshData
+struct CachedMeshDataOpenGLBuffer : public CachedMeshData
 {
-    GLuint displayList;
-    Image image;
-    CachedMeshData(const Mesh & mesh)
-        : displayList(allocateDisplayList()), image(mesh.image)
+    GLuint buffer;
+    GLsizeiptrARB vertexSize, colorSize, textureCoordSize;
+    GLsizei vertexCount;
+    CachedMeshDataOpenGLBuffer(const Mesh & mesh)
+        : CachedMeshData(mesh.image), buffer(allocateBuffer()), vertexCount(3 * mesh.triangles.size())
     {
-        glNewList(displayList, GL_COMPILE);
-        renderInternal(mesh);
-        glEndList();
+        fnGLBindBufferARB(GL_ARRAY_BUFFER_ARB, buffer);
+        vertexSize = mesh.triangles.size() * 3 * 3 * sizeof(float);
+        colorSize = mesh.triangles.size() * 4 * 3 * sizeof(float);
+        textureCoordSize = mesh.triangles.size() * 2 * 3 * sizeof(float);
+        fnGLBufferDataARB(GL_ARRAY_BUFFER_ARB, vertexSize + colorSize + textureCoordSize, nullptr, GL_STATIC_DRAW_ARB);
+        void *bufferPtr = fnGLMapBufferARB(GL_ARRAY_BUFFER_ARB, GL_WRITE_ONLY_ARB);
+        if(bufferPtr == nullptr)
+        {
+            cerr << "error : can't map opengl buffer\n" << flush;
+            abort();
+        }
+        float *vertexArray = (float *)(char *)bufferPtr;
+        float *colorArray = (float *)((char *)bufferPtr + vertexSize);
+        float *textureCoordArray = (float *)((char *)bufferPtr + vertexSize + colorSize);
+        for(size_t i = 0; i < mesh.triangles.size(); i++)
+        {
+            Triangle tri = mesh.triangles[i];
+            vertexArray[i * 3 * 3 + 0 * 3 + 0] = tri.p1.x;
+            vertexArray[i * 3 * 3 + 0 * 3 + 1] = tri.p1.y;
+            vertexArray[i * 3 * 3 + 0 * 3 + 2] = tri.p1.z;
+            vertexArray[i * 3 * 3 + 1 * 3 + 0] = tri.p2.x;
+            vertexArray[i * 3 * 3 + 1 * 3 + 1] = tri.p2.y;
+            vertexArray[i * 3 * 3 + 1 * 3 + 2] = tri.p2.z;
+            vertexArray[i * 3 * 3 + 2 * 3 + 0] = tri.p3.x;
+            vertexArray[i * 3 * 3 + 2 * 3 + 1] = tri.p3.y;
+            vertexArray[i * 3 * 3 + 2 * 3 + 2] = tri.p3.z;
+            textureCoordArray[i * 3 * 2 + 0 * 2 + 0] = tri.t1.u;
+            textureCoordArray[i * 3 * 2 + 0 * 2 + 1] = tri.t1.v;
+            textureCoordArray[i * 3 * 2 + 1 * 2 + 0] = tri.t2.u;
+            textureCoordArray[i * 3 * 2 + 1 * 2 + 1] = tri.t2.v;
+            textureCoordArray[i * 3 * 2 + 2 * 2 + 0] = tri.t3.u;
+            textureCoordArray[i * 3 * 2 + 2 * 2 + 1] = tri.t3.v;
+            colorArray[i * 3 * 4 + 0 * 4 + 0] = tri.c1.r;
+            colorArray[i * 3 * 4 + 0 * 4 + 1] = tri.c1.g;
+            colorArray[i * 3 * 4 + 0 * 4 + 2] = tri.c1.b;
+            colorArray[i * 3 * 4 + 0 * 4 + 3] = tri.c1.a;
+            colorArray[i * 3 * 4 + 1 * 4 + 0] = tri.c2.r;
+            colorArray[i * 3 * 4 + 1 * 4 + 1] = tri.c2.g;
+            colorArray[i * 3 * 4 + 1 * 4 + 2] = tri.c2.b;
+            colorArray[i * 3 * 4 + 1 * 4 + 3] = tri.c2.a;
+            colorArray[i * 3 * 4 + 2 * 4 + 0] = tri.c3.r;
+            colorArray[i * 3 * 4 + 2 * 4 + 1] = tri.c3.g;
+            colorArray[i * 3 * 4 + 2 * 4 + 2] = tri.c3.b;
+            colorArray[i * 3 * 4 + 2 * 4 + 3] = tri.c3.a;
+        }
+        fnGLUnmapBufferARB(GL_ARRAY_BUFFER_ARB);
+        fnGLBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
     }
-    ~CachedMeshData()
+    virtual ~CachedMeshDataOpenGLBuffer()
     {
-        freeDisplayList(displayList);
+        freeBuffer(buffer);
     }
-    void render(Matrix tform, bool enableDepthBuffer)
+    virtual void render(Matrix tform, bool enableDepthBuffer) override
     {
         image.bind();
         glDepthMask(enableDepthBuffer ? GL_TRUE : GL_FALSE);
         glMatrixMode(GL_MODELVIEW);
         glLoadMatrix(tform);
-        glCallList(displayList);
+        fnGLBindBufferARB(GL_ARRAY_BUFFER_ARB, buffer);
+        glVertexPointer(3, GL_FLOAT, 0, (const void *)(GLintptrARB)0);
+        glTexCoordPointer(2, GL_FLOAT, 0, (const void *)(GLintptrARB)(vertexSize + colorSize));
+        glColorPointer(4, GL_FLOAT, 0, (const void *)(GLintptrARB)vertexSize);
+        glDrawArrays(GL_TRIANGLES, 0, vertexCount);
         glLoadIdentity();
+        fnGLBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
     }
 };
+
+shared_ptr<CachedMeshData> makeCachedMeshData(const Mesh &mesh)
+{
+    if(haveOpenGLBuffers)
+        return make_shared<CachedMeshDataOpenGLBuffer>(mesh);
+    return make_shared<CachedMeshDataDisplayList>(mesh);
+}
 }
 
 struct CachedMesh
@@ -1186,7 +1308,9 @@ struct CachedMesh
 
 shared_ptr<CachedMesh> makeCachedMesh(const Mesh & mesh)
 {
-    return make_shared<CachedMesh>(Matrix::identity(), make_shared<CachedMeshData>(mesh));
+    if(mesh.triangles.empty())
+        return make_shared<CachedMesh>(Matrix::identity(), nullptr);
+    return make_shared<CachedMesh>(Matrix::identity(), makeCachedMeshData(mesh));
 }
 
 shared_ptr<CachedMesh> transform(const Matrix & m, shared_ptr<CachedMesh> mesh)
@@ -1196,5 +1320,11 @@ shared_ptr<CachedMesh> transform(const Matrix & m, shared_ptr<CachedMesh> mesh)
 
 void Display::render(shared_ptr<CachedMesh> m, bool enableDepthBuffer)
 {
-    m->data->render(m->tform, enableDepthBuffer);
+    if(m->data)
+        m->data->render(m->tform, enableDepthBuffer);
+}
+
+static void getExtensions()
+{
+    getOpenGLBuffersExtension();
 }

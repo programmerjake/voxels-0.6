@@ -33,6 +33,18 @@ public:
     {
         return *this << (Mesh)m;
     }
+    Renderer & operator <<(TransformedMeshRef m)
+    {
+        return *this << (Mesh)m;
+    }
+    Renderer & operator <<(ColorizedMeshRef m)
+    {
+        return *this << (Mesh)m;
+    }
+    Renderer & operator <<(ColorizedTransformedMeshRef m)
+    {
+        return *this << (Mesh)m;
+    }
     Renderer & operator <<(shared_ptr<Mesh> m)
     {
         assert(m != nullptr);

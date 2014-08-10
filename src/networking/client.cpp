@@ -61,7 +61,7 @@ class Client
     }
     int32_t getViewDistance()
     {
-        return 32;
+        return 64;
     }
     void reader(shared_ptr<stream::Reader> preader)
     {
