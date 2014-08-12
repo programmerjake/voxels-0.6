@@ -37,11 +37,11 @@
 			</Target>
 		</Build>
 		<Compiler>
-			<Add option="-march=pentium4" />
 			<Add option="-std=c++11" />
 			<Add option="-Wall" />
 			<Add option="-mfpmath=sse" />
 			<Add option="`sdl2-config --cflags`" />
+			<Add option="-march=native" />
 			<Add directory="include" />
 		</Compiler>
 		<Linker>
