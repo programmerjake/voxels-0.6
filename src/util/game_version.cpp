@@ -18,7 +18,7 @@
  */
 #include "util/game_version.h"
 
-const wstring GameVersion::VERSION = L"0.6.1.87";
+const wstring GameVersion::VERSION = L"0.6.1.95";
 const uint32_t GameVersion::FILE_VERSION = 0;
 
 #ifdef COMPILE_DUMP_VERSION
@@ -26,7 +26,7 @@ const uint32_t GameVersion::FILE_VERSION = 0;
 
 int main(int argc, char ** argv)
 {
-    const int curVersion = 87;
+    const int curVersion = 95;
     if(argc > 1 && string(argv[1]) == "--next-version")
         cout << (curVersion + 1) << endl;
     else if(argc > 1 && string(argv[1]) == "--next-version-str")

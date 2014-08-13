@@ -109,7 +109,9 @@ class Client
             starting = false;
             running = false;
         }
-        //running = false;
+        running = false;
+        somethingToWrite.set();
+        cout << "client reader stopped.\x1b[K" << endl;
     }
     void writer(shared_ptr<stream::Writer> pwriter)
     {
@@ -164,6 +166,8 @@ class Client
             cerr << "IO Error : " << e.what() << endl;
             running = false;
         }
+        running = false;
+        cout << "client writer stopped.\x1b[K" << endl;
     }
     void meshGenerator()
     {
@@ -187,6 +191,7 @@ class Client
     bool isRShiftDown = false;
     bool isShiftDown = false;
     bool isFDown = false;
+    bool isPaused = false;
     struct MyEventHandler : public EventHandler
     {
         Client & client;
@@ -204,6 +209,8 @@ class Client
         }
         virtual bool handleMouseMove(MouseMoveEvent &event) override
         {
+            if(client.isPaused)
+                return false;
             client.deltaTheta -= event.deltaX / 300;
             client.deltaPhi -= event.deltaY / 300;
             return true;
@@ -270,6 +277,8 @@ class Client
         }
         virtual bool handleKeyDown(KeyDownEvent &event) override
         {
+            if(event.key == KeyboardKey_P && !event.isRepetition)
+                client.isPaused = !client.isPaused;
             if(event.key == KeyboardKey_A)
             {
                 client.isADown = true;
@@ -351,6 +360,7 @@ public:
         starting = true;
         thread(&Client::reader, this, streamRW->preader()).detach();
         thread(&Client::writer, this, streamRW->pwriter()).detach();
+        streamRW = nullptr;
         thread(&Client::meshGenerator, this).detach();
         starting.wait(false);
         startGraphics();
@@ -380,30 +390,35 @@ public:
             }
             Display::flip(60);
             Display::handleEvents(shared_ptr<EventHandler>(new MyEventHandler(*this)));
+            if(!isPaused != Display::grabMouse())
+                Display::grabMouse(!isPaused);
             setViewTheta(fmod(getViewTheta() + deltaTheta * 0.5, 2 * M_PI));
             deltaTheta *= 0.5;
             setViewPhi(limit<float>(getViewPhi() + deltaPhi * 0.5, -M_PI / 2, M_PI / 2));
             deltaPhi *= 0.5;
-            VectorF deltaPosition = VectorF(0);
-            VectorF forwardVector = Matrix::rotateY(getViewTheta()).applyNoTranslate(VectorF(0, 0, -1));
-            VectorF leftVector = Matrix::rotateY(getViewTheta()).applyNoTranslate(VectorF(-1, 0, 0));
-            VectorF upVector = VectorF(0, 1, 0);
-            if(isWDown)
-                deltaPosition += forwardVector;
-            if(isSDown)
-                deltaPosition -= forwardVector;
-            if(isADown)
-                deltaPosition += leftVector;
-            if(isDDown)
-                deltaPosition -= leftVector;
-            if(isSpaceDown)
-                deltaPosition += upVector;
-            if(isShiftDown)
-                deltaPosition -= upVector;
-            deltaPosition *= Display::frameDeltaTime() * 1.5;
-            if(isFDown)
-                deltaPosition *= 5;
-            setViewPosition(getViewPosition() + deltaPosition);
+            if(!isPaused)
+            {
+                VectorF deltaPosition = VectorF(0);
+                VectorF forwardVector = Matrix::rotateY(getViewTheta()).applyNoTranslate(VectorF(0, 0, -1));
+                VectorF leftVector = Matrix::rotateY(getViewTheta()).applyNoTranslate(VectorF(-1, 0, 0));
+                VectorF upVector = VectorF(0, 1, 0);
+                if(isWDown)
+                    deltaPosition += forwardVector;
+                if(isSDown)
+                    deltaPosition -= forwardVector;
+                if(isADown)
+                    deltaPosition += leftVector;
+                if(isDDown)
+                    deltaPosition -= leftVector;
+                if(isSpaceDown)
+                    deltaPosition += upVector;
+                if(isShiftDown)
+                    deltaPosition -= upVector;
+                deltaPosition *= Display::frameDeltaTime() * 1.5;
+                if(isFDown)
+                    deltaPosition *= 5;
+                setViewPosition(getViewPosition() + deltaPosition);
+            }
         }
         running = false;
         somethingToWrite.set();

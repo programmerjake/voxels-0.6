@@ -149,7 +149,7 @@ class Server
         unordered_set<PositionI> blockUpdatesSet;
         deque<PositionI> blockUpdatesQueue;
         Connection(atomic_uint &connectionCount, flag &anyConnections)
-            : connectionCount(connectionCount), anyConnections(anyConnections)
+            : connectionCount(connectionCount), anyConnections(anyConnections), done(false)
         {
             connectionCount++;
             anyConnections = true;
@@ -211,6 +211,7 @@ class Server
         }
         connection.eventWaitCond.notify_all();
         connection.done = true;
+        cout << "server reader stopped\x1b[K" << endl;
     }
     bool writeRequestedChunks(Connection &connection, stream::Writer &writer)
     {
@@ -305,6 +306,7 @@ class Server
         }
         connection.eventWaitCond.notify_all();
         connection.done = true;
+        cout << "server writer stopped\x1b[K" << endl;
     }
     void startConnection(shared_ptr<stream::StreamRW> streamRW)
     {
@@ -424,6 +426,7 @@ class Server
         auto lastTime = chrono::steady_clock::now();
         default_random_engine randomEngine;
         uniform_int_distribution<int32_t> xzPositionDistribution(-16, 16), yPositionDistribution(32, 96), blockTypeDistribution(0, 3);
+        bool gotConnection = false;
         while(running)
         {
             for(size_t i = 0; i < 1; i++)
@@ -461,7 +464,16 @@ class Server
             lastTime = currentTime;
             if(currentTime < sleepTillTime)
                 this_thread::sleep_for(sleepTillTime - currentTime);
+            cout << "Connection Count : " << connectionCount << "\x1b[K\r" << flush;
+            if(anyConnections)
+                gotConnection = true;
+            else if(gotConnection)
+            {
+                running = false;
+                generateChunksCond.notify_all();
+            }
         }
+        exit(0);
     }
     unordered_set<PositionI> needGenerateChunks;
     unordered_set<PositionI> generatingChunks;
